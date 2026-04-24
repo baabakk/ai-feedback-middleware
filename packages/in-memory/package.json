@@ -1,0 +1,55 @@
+{
+  "name": "@llm-feedback-middleware/in-memory",
+  "version": "0.0.0",
+  "description": "In-memory adapters for llm-feedback-middleware. Use for tests and small single-process deployments.",
+  "license": "Apache-2.0",
+  "author": "Babak Abbaschian",
+  "homepage": "https://github.com/baabakk/llm-feedback-middleware",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
+    "directory": "packages/in-memory"
+  },
+  "bugs": {
+    "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
+  },
+  "keywords": [
+    "feedback",
+    "ai",
+    "llm",
+    "in-memory",
+    "test"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@llm-feedback-middleware/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
