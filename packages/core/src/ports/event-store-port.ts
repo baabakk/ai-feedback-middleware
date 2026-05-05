@@ -30,6 +30,17 @@ export interface EventStorePort {
   /** Read all events for a single partition, in event_position order. */
   readStream(partitionKey: string, fromVersion?: number): AsyncIterable<FeedbackEvent>;
 
+  /**
+   * Read events for a single partition with timestamp >= sinceTimestamp,
+   * in event_position order. Used by inference-rule history loading so the
+   * cutoff filter pushes to the storage layer instead of allocating the
+   * entire partition into memory.
+   *
+   * `sinceTimestamp` is ISO-8601. Events with timestamps that fail to parse
+   * are excluded.
+   */
+  readStreamSince(partitionKey: string, sinceTimestamp: string): AsyncIterable<FeedbackEvent>;
+
   /** Read all events matching a filter, paged. */
   readAll(filter?: EventFilter, pageSize?: number): AsyncIterable<FeedbackEvent>;
 

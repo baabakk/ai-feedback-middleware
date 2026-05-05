@@ -64,6 +64,41 @@ export function runEventStoreConformance(options: EventStoreConformanceOptions):
       expect(v2plus.map((e) => e.event_id)).toEqual(["v2", "v3"]);
     });
 
+    it("readStreamSince filters events older than the cutoff", async () => {
+      await adapter.append(makeEvent({ event_id: "old", timestamp: "2026-01-01T00:00:00Z" }));
+      await adapter.append(makeEvent({ event_id: "mid", timestamp: "2026-04-01T00:00:00Z" }));
+      await adapter.append(makeEvent({ event_id: "new", timestamp: "2026-04-20T00:00:00Z" }));
+
+      const since = "2026-03-15T00:00:00Z";
+      const recent = await collect(adapter.readStreamSince("p-1", since));
+      const ids = recent.map((e) => e.event_id);
+      expect(ids).toContain("mid");
+      expect(ids).toContain("new");
+      expect(ids).not.toContain("old");
+    });
+
+    it("readStreamSince scopes by partition_key", async () => {
+      await adapter.append(
+        makeEvent({
+          event_id: "a-recent",
+          partition_key: "p-A",
+          artifact_id: "p-A",
+          timestamp: "2026-04-20T00:00:00Z",
+        }),
+      );
+      await adapter.append(
+        makeEvent({
+          event_id: "b-recent",
+          partition_key: "p-B",
+          artifact_id: "p-B",
+          timestamp: "2026-04-20T00:00:00Z",
+        }),
+      );
+
+      const aOnly = await collect(adapter.readStreamSince("p-A", "2026-04-01T00:00:00Z"));
+      expect(aOnly.map((e) => e.event_id)).toEqual(["a-recent"]);
+    });
+
     it("appendBatch preserves order", async () => {
       await adapter.appendBatch([
         makeEvent({ event_id: "x" }),

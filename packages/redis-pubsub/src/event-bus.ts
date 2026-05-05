@@ -11,6 +11,12 @@ export interface RedisPubSubOptions {
   connection: string | RedisOptions;
   /** Optional prefix prepended to every topic. Useful for multi-tenant isolation. */
   topicPrefix?: string;
+  /**
+   * Optional error callback fired when a subscriber handler throws or when
+   * a delivered message fails to parse. Default: silent (preserves prior
+   * behavior). Wire to a logger / metrics system to gain visibility.
+   */
+  onError?: (err: unknown, context: { phase: "parse" | "handler"; topic?: string }) => void;
 }
 
 /**
@@ -31,6 +37,7 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
   const publisher = makeRedis(options.connection);
   const subscriber = makeRedis(options.connection);
   const prefix = options.topicPrefix ?? "";
+  const onError = options.onError;
 
   // Map a topic pattern as we expose it to a Redis channel pattern.
   function toChannel(topic: string): string {
@@ -82,23 +89,22 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
     if (listenerInstalled) return;
     listenerInstalled = true;
     subscriber.on("pmessage", async (_pattern: string, channel: string, message: string) => {
-      // Strip prefix to get the framework topic
       const topic = prefix && channel.startsWith(prefix) ? channel.slice(prefix.length) : channel;
       let event: FeedbackEvent;
       try {
         event = JSON.parse(message) as FeedbackEvent;
-      } catch {
-        return; // ignore malformed
+      } catch (err) {
+        if (onError) onError(err, { phase: "parse", topic });
+        return;
       }
       for (const sub of subscriptions.values()) {
         for (const pat of sub.patterns) {
           if (matchesLocal(pat, topic)) {
             try {
               await sub.handler(event, topic);
-            } catch {
-              // Swallow handler errors so one bad subscriber does not
-              // break delivery to others. Production adapters should
-              // wire structured logging here.
+            } catch (err) {
+              // Surface handler errors but keep dispatching to other subscribers.
+              if (onError) onError(err, { phase: "handler", topic });
             }
             break;
           }
@@ -110,7 +116,8 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
       let event: FeedbackEvent;
       try {
         event = JSON.parse(message) as FeedbackEvent;
-      } catch {
+      } catch (err) {
+        if (onError) onError(err, { phase: "parse", topic });
         return;
       }
       for (const sub of subscriptions.values()) {
@@ -118,8 +125,8 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
           if (matchesLocal(pat, topic)) {
             try {
               await sub.handler(event, topic);
-            } catch {
-              /* swallow */
+            } catch (err) {
+              if (onError) onError(err, { phase: "handler", topic });
             }
             break;
           }

@@ -47,6 +47,17 @@ export interface CreateFeedbackOptions {
    */
   publishMiddleware?: Middleware<FeedbackEvent>[];
 
+  /**
+   * Optional callback fired when the post-commit direct publish fails. When
+   * an outbox is configured, the direct publish is a best-effort fast path
+   * and failures are otherwise silent (the outbox scanner will retry). Wire
+   * this to a logger/metrics system to gain visibility.
+   *
+   * If no outbox is configured, capture() throws on publish failure
+   * regardless of this callback.
+   */
+  onPublishError?: (event: FeedbackEvent, err: unknown) => void;
+
   /** Schema version emitted on new events. Defaults to 1. */
   currentSchemaVersion?: number;
   /** Default partition_key strategy when CaptureInput.partition_key is absent. */
@@ -152,12 +163,20 @@ export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
       if (options.eventBus && publishHandler) {
         if (options.outbox) {
           // Outbox is the authority; treat direct publish as a best-effort fast path.
-          publishHandler(event).catch(() => {
-            /* outbox scanner will retry */
+          // The outbox scanner will retry on failure, but we surface the error via
+          // onPublishError so operators can see bus degradation before the backlog grows.
+          publishHandler(event).catch((err) => {
+            if (options.onPublishError) options.onPublishError(event, err);
           });
         } else {
           // No outbox: direct publish is the only delivery path. Errors propagate.
-          await publishHandler(event);
+          // We still call onPublishError if provided so callers can log before the throw.
+          try {
+            await publishHandler(event);
+          } catch (err) {
+            if (options.onPublishError) options.onPublishError(event, err);
+            throw err;
+          }
         }
       }
 
@@ -223,19 +242,18 @@ function buildPublishHandler(
 /**
  * Load recent history for a partition within a window.
  *
- * For F2 we read the entire partition stream and filter in-memory by timestamp.
- * F3+ may add an EventStorePort.readStreamSince(...) for direct DB-side filtering.
+ * Uses `EventStorePort.readStreamSince(partitionKey, sinceTimestamp)` so the
+ * cutoff filter pushes to the storage layer. Avoids pulling the full
+ * partition stream into memory for hot artifacts.
  */
 async function loadHistory(
   eventStore: EventStorePort,
   partitionKey: string,
   windowMs: number,
 ): Promise<Array<{ action: string; timestamp: string }>> {
-  const cutoff = Date.now() - windowMs;
+  const sinceTimestamp = new Date(Date.now() - windowMs).toISOString();
   const out: Array<{ action: string; timestamp: string }> = [];
-  for await (const e of eventStore.readStream(partitionKey)) {
-    const t = Date.parse(e.timestamp);
-    if (Number.isNaN(t) || t < cutoff) continue;
+  for await (const e of eventStore.readStreamSince(partitionKey, sinceTimestamp)) {
     out.push({ action: e.action, timestamp: e.timestamp });
   }
   return out;

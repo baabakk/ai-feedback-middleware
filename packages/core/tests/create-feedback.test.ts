@@ -26,6 +26,13 @@ function makeStore(): EventStorePort {
     async *readStream(pk) {
       for (const e of events.filter((x) => x.partition_key === pk)) yield e;
     },
+    async *readStreamSince(pk, since) {
+      const cutoff = Date.parse(since);
+      for (const e of events.filter((x) => x.partition_key === pk)) {
+        const t = Date.parse(e.timestamp);
+        if (!Number.isNaN(t) && t >= cutoff) yield e;
+      }
+    },
     async *readAll(filter?: EventFilter) {
       for (const e of events) {
         if (filter?.action && e.action !== filter.action) continue;

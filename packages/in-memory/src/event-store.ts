@@ -75,6 +75,24 @@ export function createInMemoryEventStore(options: InMemoryEventStoreOptions = {}
       }
     },
 
+    async *readStreamSince(
+      partitionKey: string,
+      sinceTimestamp: string,
+    ): AsyncIterable<FeedbackEvent> {
+      const cutoff = Date.parse(sinceTimestamp);
+      const filtered = events
+        .filter((s) => s.event.partition_key === partitionKey)
+        .filter((s) => {
+          const t = Date.parse(s.event.timestamp);
+          if (Number.isNaN(t)) return false;
+          return t >= cutoff;
+        })
+        .sort((a, b) => a.position - b.position);
+      for (const stored of filtered) {
+        yield stored.event;
+      }
+    },
+
     async *readAll(filter?: EventFilter, _pageSize?: number): AsyncIterable<FeedbackEvent> {
       const filtered = events
         .filter((s) => matchesFilter(s.event, filter))

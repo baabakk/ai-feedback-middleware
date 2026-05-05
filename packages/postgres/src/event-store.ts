@@ -12,6 +12,13 @@ export interface PostgresEventStoreOptions {
   tableName?: string;
   /** Polling interval for subscribeAll. Default 500ms. */
   subscribePollMs?: number;
+  /**
+   * Optional error callback fired when the subscribeAll polling loop or a
+   * subscriber handler throws. Default: silent (preserves prior behavior).
+   * Wire this to a logger / metrics system to gain visibility into DB
+   * hiccups, schema drift, or subscriber bugs.
+   */
+  onError?: (err: unknown, context: { phase: "poll" | "handler" }) => void;
 }
 
 interface EventRow {
@@ -68,6 +75,7 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
   const pool = options.pool;
   const table = options.tableName ?? "feedback_events";
   const pollMs = options.subscribePollMs ?? 500;
+  const onError = options.onError;
 
   function buildWhere(filter?: EventFilter): { where: string; params: unknown[] } {
     if (!filter) return { where: "", params: [] };
@@ -193,6 +201,21 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
       }
     },
 
+    async *readStreamSince(
+      partitionKey: string,
+      sinceTimestamp: string,
+    ): AsyncIterable<FeedbackEvent> {
+      const result = await pool.query<EventRow>(
+        `SELECT * FROM ${table}
+         WHERE partition_key = $1 AND timestamp >= $2
+         ORDER BY event_position ASC`,
+        [partitionKey, sinceTimestamp],
+      );
+      for (const row of result.rows) {
+        yield rowToEvent(row);
+      }
+    },
+
     async *readAll(filter?: EventFilter, pageSize = 500): AsyncIterable<FeedbackEvent> {
       const { where, params } = buildWhere(filter);
       let lastPos = "0";
@@ -225,19 +248,29 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
       let lastPos = "0";
       const interval = setInterval(async () => {
         if (stopped) return;
+        let result;
         try {
-          const result = await pool.query<EventRow>(
+          result = await pool.query<EventRow>(
             `SELECT * FROM ${table} WHERE event_position > $1
              ORDER BY event_position ASC LIMIT 100`,
             [lastPos],
           );
-          for (const row of result.rows) {
-            if (stopped) break;
+        } catch (err) {
+          // Surface the polling error so operators can react. Loop continues
+          // so a transient DB hiccup does not permanently break delivery.
+          if (onError) onError(err, { phase: "poll" });
+          return;
+        }
+        for (const row of result.rows) {
+          if (stopped) break;
+          try {
             await handler(rowToEvent(row));
-            lastPos = row.event_position;
+          } catch (err) {
+            // Surface handler errors but keep advancing the cursor — staying
+            // stuck on a poison-pill event would block the whole stream.
+            if (onError) onError(err, { phase: "handler" });
           }
-        } catch {
-          // Swallow errors so a transient DB hiccup does not kill the loop.
+          lastPos = row.event_position;
         }
       }, pollMs);
 
