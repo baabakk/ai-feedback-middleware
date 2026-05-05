@@ -11,6 +11,7 @@ import type { OutboxPort } from "./ports/outbox-port.js";
 import type { InferenceRulesPort, InferenceRule } from "./ports/inference-rules-port.js";
 import type { Middleware } from "./middleware/types.js";
 import type { FeedbackEvent, CaptureInput, EventFilter, Provenance } from "./event-types.js";
+import { type EventUpcaster, upcastStream, validateUpcasterChain } from "./upcaster.js";
 
 export interface CreateFeedbackOptions {
   eventStore: EventStorePort;
@@ -60,6 +61,12 @@ export interface CreateFeedbackOptions {
 
   /** Schema version emitted on new events. Defaults to 1. */
   currentSchemaVersion?: number;
+  /**
+   * Optional upcasters that translate older events to the current schema
+   * version on read. Must form a contiguous chain v1 -> v2 -> ... ->
+   * currentSchemaVersion. Validated at composition time.
+   */
+  upcasters?: EventUpcaster[];
   /** Default partition_key strategy when CaptureInput.partition_key is absent. */
   defaultPartitionKey?: (input: CaptureInput) => string;
   /** Optional ID generator (defaults to crypto.randomUUID). */
@@ -75,6 +82,8 @@ export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
   const artifactTypeRegistry = new ArtifactTypeRegistry(options.artifactTypes);
   const projectionEngine = new ProjectionEngine(options.projectionStore, options.projections ?? []);
   const schemaVersion = options.currentSchemaVersion ?? 1;
+  const upcasters = options.upcasters ?? [];
+  validateUpcasterChain(upcasters, schemaVersion);
   const generateId = options.generateEventId ?? defaultIdGenerator;
   const partitionKey = options.defaultPartitionKey ?? ((input) => input.artifact_id);
   const historyWindowMs = options.historyWindowMs ?? 30 * 24 * 60 * 60 * 1000;
@@ -184,11 +193,15 @@ export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
     },
 
     readStream(partitionKey: string, fromVersion?: number): AsyncIterable<FeedbackEvent> {
-      return options.eventStore.readStream(partitionKey, fromVersion);
+      return upcastStream(
+        options.eventStore.readStream(partitionKey, fromVersion),
+        upcasters,
+        schemaVersion,
+      );
     },
 
     readAll(filter?: EventFilter, pageSize?: number): AsyncIterable<FeedbackEvent> {
-      return options.eventStore.readAll(filter, pageSize);
+      return upcastStream(options.eventStore.readAll(filter, pageSize), upcasters, schemaVersion);
     },
 
     async rebuildProjection(name: string): Promise<RebuildResult> {

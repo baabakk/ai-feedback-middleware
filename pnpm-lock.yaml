@@ -105,6 +105,28 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  examples/threshold-crystallization:
+    dependencies:
+      '@llm-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@llm-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+      '@llm-feedback-middleware/streams':
+        specifier: workspace:*
+        version: link:../../packages/streams
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/adapter-conformance:
     dependencies:
       '@llm-feedback-middleware/core':
@@ -193,6 +215,53 @@ importers:
       '@llm-feedback-middleware/adapter-conformance':
         specifier: workspace:*
         version: link:../adapter-conformance
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/reference:
+    dependencies:
+      '@llm-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@llm-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../in-memory
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/streams:
+    dependencies:
+      '@llm-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@llm-feedback-middleware/adapter-conformance':
+        specifier: workspace:*
+        version: link:../adapter-conformance
+      '@llm-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../in-memory
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)
@@ -1718,6 +1787,9 @@ packages:
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
 
+  rxjs@7.8.2:
+    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
+
   safe-regex@2.1.1:
     resolution: {integrity: sha512-rx+x8AMzKb5Q5lQ95Zoi6ZbJqwCLkqi3XuJXp5P3rT8OEc6sZCJG5AE5dU3lsgRr/F4Bs31jSlVN+j5KrsGu9A==}
 
@@ -1867,6 +1939,9 @@ packages:
   tsconfig-paths@4.2.0:
     resolution: {integrity: sha512-NoZ4roiN7LnbKn9QqE1amc9DJfzvZXxF4xDavcOWt1BPkdx+m+0gJuPM+S0vCe7zTJMYUP0R8pO2XMr+Y8oLIg==}
     engines: {node: '>=6'}
+
+  tslib@2.8.1:
+    resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
   tsup@8.5.1:
     resolution: {integrity: sha512-xtgkqwdhpKWr3tKPmCkvYmS9xnQK3m3XgxZHwSUjvfTjp7YfXe5tT3GgWi0F2N+ZSMsOeWeZFh7ZZFg5iPhing==}
@@ -3449,6 +3524,10 @@ snapshots:
     dependencies:
       queue-microtask: 1.2.3
 
+  rxjs@7.8.2:
+    dependencies:
+      tslib: 2.8.1
+
   safe-regex@2.1.1:
     dependencies:
       regexp-tree: 0.1.27
@@ -3567,6 +3646,8 @@ snapshots:
       json5: 2.2.3
       minimist: 1.2.8
       strip-bom: 3.0.0
+
+  tslib@2.8.1: {}
 
   tsup@8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3):
     dependencies:

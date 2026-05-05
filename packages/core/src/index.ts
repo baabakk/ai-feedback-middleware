@@ -38,6 +38,17 @@ export { classify, type ClassifierContext } from "./classifier.js";
 // Inference engine
 export { evaluateRules, type InferenceContext } from "./inference-engine.js";
 
+// Schema upcasters
+export {
+  type EventUpcaster,
+  upcastEvent,
+  upcastStream,
+  validateUpcasterChain,
+} from "./upcaster.js";
+
+// Edit-diff labeler (deterministic, no LLM)
+export { classifyEditDiff, type ChangeLabel } from "./edit-diff-labeler.js";
+
 // Projection engine
 export { ProjectionEngine, type ProjectionBuilder } from "./projection-engine.js";
 

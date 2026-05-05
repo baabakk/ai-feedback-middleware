@@ -195,16 +195,17 @@ JSDoc on the option marks it "STRONGLY RECOMMENDED for multi-instance deployment
 
 ### D3: Schema upcaster mechanism
 
-**Status:** Open (planned for F3)
+**Status:** ✅ Resolved 2026-04-24 (Phase F3)
+**Affected:** [`packages/core/src/upcaster.ts`](packages/core/src/upcaster.ts), [`packages/core/src/create-feedback.ts`](packages/core/src/create-feedback.ts)
 
-**Problem.** The framework spec promises schema evolution as a contract: `v1.x → v1.y` upgrades never require log mutation; readers upcast on the fly. Currently no implementation. Events are emitted at `event_version: 1` with no migration path.
+**Resolution.** Shipped:
+- `EventUpcaster` interface (`fromVersion`, `toVersion`, `upcast(event)`)
+- `validateUpcasterChain` — boot-time check for contiguous chain v1 → ... → currentVersion
+- `upcastEvent` and `upcastStream` — pure functions applying the chain
+- `createFeedback` accepts `upcasters?: EventUpcaster[]`; both `readStream` and `readAll` automatically upcast
+- 9 tests in `packages/core/tests/upcaster.test.ts`
 
-**Resolution.** Land in F3:
-
-- `EventUpcaster` interface in core
-- `createFeedback({ upcasters: [v1ToV2, v2ToV3], currentSchemaVersion: 3 })` registration
-- Reader path applies upcaster chain
-- Validator at boot ensures no missing version links
+Schema evolution contract is now backed by code: future minor-version bumps ship via upcaster registration without touching the event log.
 
 ---
 
@@ -320,17 +321,18 @@ Recommend (2) for safety.
 | ------------------- | ----------------------------- | ----------- | -------- | ------ |
 | High                | 1 (H5, deferred to Kafka/SQS) | 0           | 4        | 5      |
 | Medium (test rigor) | 3                             | 0           | 3        | 6      |
-| Medium (design)     | 6                             | 0           | 0        | 6      |
+| Medium (design)     | 5                             | 0           | 1 (D3)   | 6      |
 | Low (polish)        | 7                             | 0           | 0        | 7      |
 | New (F2.6)          | 2                             | 0           | 0        | 2      |
-| **Total**           | **19**                        | **0**       | **7**    | **26** |
+| **Total**           | **18**                        | **0**       | **8**    | **26** |
 
-**Pre-publish gate:** all 19 remaining open items must move to "In Progress" or "Resolved" before v1.0.0 publishes to npm. See [IMPLEMENTATION-PLAN.md §10.4 and §10.5](../A02-Building-a-Learning-Loop-Every-LLM-Output-as-Training-Signal/IMPLEMENTATION-PLAN.md).
+**Pre-publish gate:** all 18 remaining open items must move to "In Progress" or "Resolved" before v1.0.0 publishes to npm. See [IMPLEMENTATION-PLAN.md §10.4 and §10.5](../A02-Building-a-Learning-Loop-Every-LLM-Output-as-Training-Signal/IMPLEMENTATION-PLAN.md).
 
 **Recently resolved:**
 
 - M1, M2, M3 (test debt) — F2.5, commit `4cbe189`
-- H1, H2, H3, H4 (observability + scaling) — F2.6, commit pending
+- H1, H2, H3, H4 (observability + scaling) — F2.6, commit `005c332`
+- D3 (schema upcaster mechanism) — F3
 
 ## New tech debt discovered during F2.6
 
