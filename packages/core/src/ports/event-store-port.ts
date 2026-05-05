@@ -13,6 +13,14 @@ export type Transaction = unknown;
  * potentially future EventStoreDB / Kafka-as-store backends.
  */
 export interface EventStorePort {
+  /**
+   * Run `work` inside a transaction. Adapters that lack real transactions
+   * (e.g., in-memory) call `work(undefined)` directly and treat the whole
+   * thing as a single logical operation. Postgres opens a connection,
+   * BEGIN, runs work(client), and COMMITs (or ROLLBACKs on throw).
+   */
+  withTransaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T>;
+
   /** Append a single event. May participate in an enclosing transaction. */
   append(event: FeedbackEvent, tx?: Transaction): Promise<void>;
 

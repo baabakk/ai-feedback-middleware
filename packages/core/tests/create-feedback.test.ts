@@ -14,6 +14,9 @@ import {
 function makeStore(): EventStorePort {
   const events: FeedbackEvent[] = [];
   return {
+    async withTransaction(work) {
+      return work(undefined);
+    },
     async append(e) {
       events.push(e);
     },

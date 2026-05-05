@@ -1,5 +1,10 @@
 import type { Pool, PoolClient } from "pg";
-import type { EventStorePort, FeedbackEvent, EventFilter } from "@llm-feedback-middleware/core";
+import type {
+  EventStorePort,
+  FeedbackEvent,
+  EventFilter,
+  Transaction,
+} from "@llm-feedback-middleware/core";
 
 export interface PostgresEventStoreOptions {
   pool: Pool;
@@ -64,17 +69,10 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
   const table = options.tableName ?? "feedback_events";
   const pollMs = options.subscribePollMs ?? 500;
 
-  async function exec(sql: string, params: unknown[], tx?: unknown): Promise<{ rows: EventRow[] }> {
-    const executor = (tx ?? pool) as Pool | PoolClient;
-    const result = await executor.query<EventRow>(sql, params);
-    return { rows: result.rows };
-  }
-
   function buildWhere(filter?: EventFilter): { where: string; params: unknown[] } {
     if (!filter) return { where: "", params: [] };
     const conditions: string[] = [];
     const params: unknown[] = [];
-
     function add(col: string, val: unknown): void {
       params.push(val);
       conditions.push(`${col} = $${params.length}`);
@@ -101,87 +99,74 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
     };
   }
 
+  function executor(tx?: Transaction): Pool | PoolClient {
+    return (tx ?? pool) as Pool | PoolClient;
+  }
+
+  async function appendInternal(client: Pool | PoolClient, event: FeedbackEvent): Promise<void> {
+    await client.query(
+      `INSERT INTO ${table} (
+        event_id, event_version, timestamp, captured_at, partition_key,
+        source, polarity, inference, action,
+        artifact_type, artifact_id, artifact_version, producer, task_type,
+        payload, provenance, correction_of, correlates_with
+      ) VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9,
+        $10, $11, $12, $13, $14,
+        $15, $16, $17, $18
+      )`,
+      [
+        event.event_id,
+        event.event_version,
+        event.timestamp,
+        event.captured_at,
+        event.partition_key,
+        event.source,
+        event.polarity,
+        event.inference,
+        event.action,
+        event.artifact_type,
+        event.artifact_id,
+        event.artifact_version,
+        event.producer,
+        event.task_type,
+        JSON.stringify(event.payload),
+        JSON.stringify(event.provenance),
+        event.correction_of ?? null,
+        event.correlates_with ?? null,
+      ],
+    );
+  }
+
   return {
-    async append(event: FeedbackEvent, tx?: unknown): Promise<void> {
-      await exec(
-        `INSERT INTO ${table} (
-          event_id, event_version, timestamp, captured_at, partition_key,
-          source, polarity, inference, action,
-          artifact_type, artifact_id, artifact_version, producer, task_type,
-          payload, provenance, correction_of, correlates_with
-        ) VALUES (
-          $1, $2, $3, $4, $5,
-          $6, $7, $8, $9,
-          $10, $11, $12, $13, $14,
-          $15, $16, $17, $18
-        )`,
-        [
-          event.event_id,
-          event.event_version,
-          event.timestamp,
-          event.captured_at,
-          event.partition_key,
-          event.source,
-          event.polarity,
-          event.inference,
-          event.action,
-          event.artifact_type,
-          event.artifact_id,
-          event.artifact_version,
-          event.producer,
-          event.task_type,
-          JSON.stringify(event.payload),
-          JSON.stringify(event.provenance),
-          event.correction_of ?? null,
-          event.correlates_with ?? null,
-        ],
-        tx,
-      );
+    async withTransaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await work(client);
+        await client.query("COMMIT");
+        return result;
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
     },
 
-    async appendBatch(batch: FeedbackEvent[], tx?: unknown): Promise<void> {
+    async append(event: FeedbackEvent, tx?: Transaction): Promise<void> {
+      await appendInternal(executor(tx), event);
+    },
+
+    async appendBatch(batch: FeedbackEvent[], tx?: Transaction): Promise<void> {
       if (batch.length === 0) return;
-      // For correctness over speed, append each in turn within the same connection
-      // (or transaction if provided). A future optimization can use multi-row insert.
-      const executor = (tx ?? pool) as Pool | PoolClient;
       const ownClient = !tx;
-      const client = ownClient ? await pool.connect() : (executor as PoolClient);
+      const client = ownClient ? await pool.connect() : (tx as PoolClient);
       try {
         if (ownClient) await client.query("BEGIN");
         for (const event of batch) {
-          await client.query(
-            `INSERT INTO ${table} (
-              event_id, event_version, timestamp, captured_at, partition_key,
-              source, polarity, inference, action,
-              artifact_type, artifact_id, artifact_version, producer, task_type,
-              payload, provenance, correction_of, correlates_with
-            ) VALUES (
-              $1, $2, $3, $4, $5,
-              $6, $7, $8, $9,
-              $10, $11, $12, $13, $14,
-              $15, $16, $17, $18
-            )`,
-            [
-              event.event_id,
-              event.event_version,
-              event.timestamp,
-              event.captured_at,
-              event.partition_key,
-              event.source,
-              event.polarity,
-              event.inference,
-              event.action,
-              event.artifact_type,
-              event.artifact_id,
-              event.artifact_version,
-              event.producer,
-              event.task_type,
-              JSON.stringify(event.payload),
-              JSON.stringify(event.provenance),
-              event.correction_of ?? null,
-              event.correlates_with ?? null,
-            ],
-          );
+          await appendInternal(client, event);
         }
         if (ownClient) await client.query("COMMIT");
       } catch (err) {
@@ -236,9 +221,6 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
       handler: (event: FeedbackEvent) => Promise<void>,
       _fromPosition?: string,
     ): () => Promise<void> {
-      // Polling implementation. Adapters with native LISTEN/NOTIFY can replace
-      // this, but polling keeps the dependency surface minimal and works against
-      // any Postgres-compatible backend.
       let stopped = false;
       let lastPos = "0";
       const interval = setInterval(async () => {
@@ -256,7 +238,6 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
           }
         } catch {
           // Swallow errors so a transient DB hiccup does not kill the loop.
-          // Production adapters should add structured logging.
         }
       }, pollMs);
 

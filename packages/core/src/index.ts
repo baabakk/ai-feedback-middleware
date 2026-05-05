@@ -21,7 +21,7 @@ export {
   type RetentionPolicy,
 } from "./registry/artifact-types.js";
 
-// Default actions + their payload schemas
+// Default actions + payload schemas
 export {
   DEFAULT_ACTIONS,
   ApprovePayloadSchema,
@@ -35,6 +35,9 @@ export {
 // Classifier
 export { classify, type ClassifierContext } from "./classifier.js";
 
+// Inference engine
+export { evaluateRules, type InferenceContext } from "./inference-engine.js";
+
 // Projection engine
 export { ProjectionEngine, type ProjectionBuilder } from "./projection-engine.js";
 
@@ -42,6 +45,33 @@ export { ProjectionEngine, type ProjectionBuilder } from "./projection-engine.js
 export type { EventStorePort, Transaction } from "./ports/event-store-port.js";
 export type { ProjectionStorePort } from "./ports/projection-store-port.js";
 export type { FeedbackPort, RebuildResult, Unsubscribe } from "./ports/feedback-port.js";
+export type { EventBusPort, SubscribeOptions } from "./ports/event-bus-port.js";
+export { topicsFor } from "./ports/event-bus-port.js";
+export type { DedupeStorePort } from "./ports/dedupe-store-port.js";
+export type { MetricsPort } from "./ports/metrics-port.js";
+export { noopMetrics } from "./ports/metrics-port.js";
+export type {
+  InferenceRulesPort,
+  InferenceRule,
+  RulePredicate,
+} from "./ports/inference-rules-port.js";
+export type { OutboxPort, OutboxRow } from "./ports/outbox-port.js";
+
+// Middleware
+export {
+  type Middleware,
+  compose,
+  loggingMiddleware,
+  type LoggingOptions,
+  validationMiddleware,
+  injectProvenanceMiddleware,
+  metricsMiddleware,
+  retryMiddleware,
+  type RetryOptions,
+  idempotencyMiddleware,
+  type IdempotencyOptions,
+  correlationIdMiddleware,
+} from "./middleware/index.js";
 
 // Factory
 export { createFeedback, type CreateFeedbackOptions } from "./create-feedback.js";

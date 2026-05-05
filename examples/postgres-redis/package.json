@@ -1,0 +1,24 @@
+{
+  "name": "postgres-redis",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Full-stack example: Postgres event store + Redis pub/sub + outbox + middleware pipeline.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@llm-feedback-middleware/core": "workspace:*",
+    "@llm-feedback-middleware/postgres": "workspace:*",
+    "@llm-feedback-middleware/redis-pubsub": "workspace:*",
+    "ioredis": "^5.4.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

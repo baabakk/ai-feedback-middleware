@@ -1,36 +1,54 @@
 import type { Polarity, Inference } from "./event-types.js";
 import type { FeedbackActionDefinition } from "./registry/actions.js";
+import type { InferenceRule } from "./ports/inference-rules-port.js";
+import { evaluateRules, type InferenceContext } from "./inference-engine.js";
 
 /**
- * Context passed to the classifier for inference rule evaluation.
+ * Context passed to the classifier.
  *
- * In F0, classifier ignores history and always returns the action's defaults.
- * F2 adds the inference rules engine that uses recentActions.
+ * - `rules`: the active inference rules (loaded by createFeedback at capture time)
+ * - `history`: recent events for the partition (for threshold evaluation)
+ * - `now`: optional override for testing
  */
 export interface ClassifierContext {
-  /** Recent events for the same partition (for threshold-based inference rules in F2+). */
-  recentActions?: ReadonlyArray<{ action: string; timestamp: string }>;
-  /** Optional: now timestamp (defaults to new Date().toISOString()). */
+  task_type: string;
+  producer: string;
+  artifact_type: string;
+  rules?: InferenceRule[];
+  history?: ReadonlyArray<{ action: string; timestamp: string }>;
   now?: string;
 }
 
 /**
- * Pure deterministic classifier.
+ * Pure deterministic classifier. Same inputs produce same outputs, always.
+ * No LLM, no I/O, no randomness.
  *
- * Same inputs produce same outputs, always. No LLM, no I/O, no randomness.
- * In F0 this returns the action's default polarity and default inference.
- * F2 will extend with threshold-based inference rules.
+ * Polarity is the action's default. Inference is the action's default unless
+ * a registered rule matches the predicate AND the threshold is met within
+ * the configured window, in which case the rule's `result_if_met` wins.
  */
 export function classify(
   action: FeedbackActionDefinition,
   _payload: unknown,
-  _context: ClassifierContext = {},
+  context?: ClassifierContext,
 ): {
   polarity: Polarity;
   inference: Inference;
 } {
-  return {
-    polarity: action.polarity,
-    inference: action.defaultInference,
-  };
+  const polarity = action.polarity;
+  let inference: Inference = action.defaultInference;
+
+  if (context && context.rules && context.rules.length > 0) {
+    const inferenceContext: InferenceContext = {
+      action: action.name,
+      task_type: context.task_type,
+      producer: context.producer,
+      artifact_type: context.artifact_type,
+      recentActions: context.history ?? [],
+      ...(context.now !== undefined && { now: context.now }),
+    };
+    inference = evaluateRules(context.rules, inferenceContext, action.defaultInference);
+  }
+
+  return { polarity, inference };
 }

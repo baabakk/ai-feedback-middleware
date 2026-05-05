@@ -47,18 +47,83 @@ describe("classifier (F0: returns action defaults)", () => {
     expect(r1).toEqual(r2);
   });
 
-  it("ignores recentActions context in F0 (rules engine ships in F2)", () => {
-    const ctxWithMany = {
-      recentActions: [
-        { action: "expired", timestamp: "2026-04-01T00:00:00Z" },
-        { action: "expired", timestamp: "2026-04-02T00:00:00Z" },
-        { action: "expired", timestamp: "2026-04-03T00:00:00Z" },
-        { action: "expired", timestamp: "2026-04-04T00:00:00Z" },
-        { action: "expired", timestamp: "2026-04-05T00:00:00Z" },
-      ],
-    };
-    const result = classify(byName["expired"]!, {}, ctxWithMany);
-    // F0 returns default; F2 will return blacklist after 5 expires
+  it("returns the action's defaultInference when no rules are registered", () => {
+    const result = classify(
+      byName["expired"]!,
+      {},
+      {
+        task_type: "test",
+        producer: "test",
+        artifact_type: "draft",
+        history: [
+          { action: "expired", timestamp: "2026-04-01T00:00:00Z" },
+          { action: "expired", timestamp: "2026-04-02T00:00:00Z" },
+        ],
+        // No rules registered, so history is ignored.
+      },
+    );
+    expect(result.inference).toBe("observe");
+  });
+
+  it("applies a registered rule: 5 expires within 7 days -> blacklist", () => {
+    const now = "2026-04-10T00:00:00Z";
+    const result = classify(
+      byName["expired"]!,
+      {},
+      {
+        task_type: "draft:email",
+        producer: "agent",
+        artifact_type: "draft",
+        now,
+        rules: [
+          {
+            rule_id: "expired_to_blacklist",
+            applies_when: { action: "expired" },
+            threshold: 5,
+            window_ms: 7 * 24 * 60 * 60 * 1000,
+            result_if_met: "blacklist",
+            active: true,
+          },
+        ],
+        history: [
+          { action: "expired", timestamp: "2026-04-08T00:00:00Z" },
+          { action: "expired", timestamp: "2026-04-09T00:00:00Z" },
+          { action: "expired", timestamp: "2026-04-09T06:00:00Z" },
+          { action: "expired", timestamp: "2026-04-09T12:00:00Z" },
+          { action: "expired", timestamp: "2026-04-09T18:00:00Z" },
+        ],
+      },
+    );
+    expect(result.inference).toBe("blacklist");
+  });
+
+  it("rule fires only when history meets threshold", () => {
+    const now = "2026-04-10T00:00:00Z";
+    const result = classify(
+      byName["expired"]!,
+      {},
+      {
+        task_type: "draft:email",
+        producer: "agent",
+        artifact_type: "draft",
+        now,
+        rules: [
+          {
+            rule_id: "expired_to_blacklist",
+            applies_when: { action: "expired" },
+            threshold: 5,
+            window_ms: 7 * 24 * 60 * 60 * 1000,
+            result_if_met: "blacklist",
+            active: true,
+          },
+        ],
+        history: [
+          // Only 2 within the window — not enough.
+          { action: "expired", timestamp: "2026-04-09T00:00:00Z" },
+          { action: "expired", timestamp: "2026-04-09T12:00:00Z" },
+        ],
+      },
+    );
     expect(result.inference).toBe("observe");
   });
 });

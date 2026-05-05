@@ -1,4 +1,9 @@
-import type { EventStorePort, FeedbackEvent, EventFilter } from "@llm-feedback-middleware/core";
+import type {
+  EventStorePort,
+  FeedbackEvent,
+  EventFilter,
+  Transaction,
+} from "@llm-feedback-middleware/core";
 
 export interface InMemoryEventStoreOptions {
   /** Optional initial events (useful for tests). */
@@ -38,6 +43,11 @@ export function createInMemoryEventStore(options: InMemoryEventStoreOptions = {}
   }
 
   return {
+    async withTransaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+      // No real transactions in-memory; treat the work block as atomic-by-fiat.
+      return work(undefined);
+    },
+
     async append(event: FeedbackEvent): Promise<void> {
       events.push({ event, position: nextPosition++ });
       // Notify subscribers serially so handler errors propagate predictably in tests.
