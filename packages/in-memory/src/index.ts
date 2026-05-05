@@ -6,3 +6,4 @@ export {
   createInMemoryInferenceRulesStore,
   type InMemoryInferenceRulesOptions,
 } from "./inference-rules.js";
+export { createInMemoryOutbox } from "./outbox.js";
