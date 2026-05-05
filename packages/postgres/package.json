@@ -1,14 +1,14 @@
 {
-  "name": "@llm-feedback-middleware/in-memory",
+  "name": "@llm-feedback-middleware/postgres",
   "version": "0.0.0",
-  "description": "In-memory adapters for llm-feedback-middleware. Use for tests and small single-process deployments.",
+  "description": "Postgres event store and projection store adapters for llm-feedback-middleware.",
   "license": "Apache-2.0",
   "author": "Babak Abbaschian",
   "homepage": "https://github.com/baabakk/llm-feedback-middleware",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
-    "directory": "packages/in-memory"
+    "directory": "packages/postgres"
   },
   "bugs": {
     "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
@@ -17,8 +17,8 @@
     "feedback",
     "ai",
     "llm",
-    "in-memory",
-    "test"
+    "postgres",
+    "event-sourcing"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -28,10 +28,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./migrations": "./migrations/"
   },
   "files": [
     "dist",
+    "migrations",
     "README.md",
     "LICENSE"
   ],
@@ -42,10 +44,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*"
+    "@llm-feedback-middleware/core": "workspace:*",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@llm-feedback-middleware/adapter-conformance": "workspace:*",
+    "@types/pg": "^8.11.10",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

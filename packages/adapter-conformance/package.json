@@ -1,14 +1,14 @@
 {
-  "name": "@llm-feedback-middleware/in-memory",
+  "name": "@llm-feedback-middleware/adapter-conformance",
   "version": "0.0.0",
-  "description": "In-memory adapters for llm-feedback-middleware. Use for tests and small single-process deployments.",
+  "description": "Conformance test suites that any EventStorePort or ProjectionStorePort adapter must pass.",
   "license": "Apache-2.0",
   "author": "Babak Abbaschian",
   "homepage": "https://github.com/baabakk/llm-feedback-middleware",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
-    "directory": "packages/in-memory"
+    "directory": "packages/adapter-conformance"
   },
   "bugs": {
     "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
@@ -17,8 +17,8 @@
     "feedback",
     "ai",
     "llm",
-    "in-memory",
-    "test"
+    "test",
+    "conformance"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -37,15 +37,16 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "echo 'no tests in conformance package itself'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@llm-feedback-middleware/core": "workspace:*"
   },
+  "peerDependencies": {
+    "vitest": "^2.0.0 || ^3.0.0"
+  },
   "devDependencies": {
-    "@llm-feedback-middleware/adapter-conformance": "workspace:*",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

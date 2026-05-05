@@ -9,6 +9,25 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: feedback
+          POSTGRES_PASSWORD: feedback
+          POSTGRES_DB: feedback_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      FEEDBACK_TEST_DATABASE_URL: postgres://feedback:feedback@localhost:5432/feedback_test
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,6 +47,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build core (required by adapter packages)
+        run: pnpm --filter @llm-feedback-middleware/core build
+
+      - name: Build adapter-conformance (required by tests)
+        run: pnpm --filter @llm-feedback-middleware/adapter-conformance build
+
       - name: Lint
         run: pnpm lint
 
@@ -37,11 +62,14 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      - name: Test (in-memory + core)
+        run: pnpm --filter @llm-feedback-middleware/core --filter @llm-feedback-middleware/in-memory test
+
+      - name: Test (postgres, against service container)
+        run: pnpm --filter @llm-feedback-middleware/postgres test
 
       - name: Dependency boundaries
         run: pnpm depcheck
 
-      - name: Build
+      - name: Build all packages
         run: pnpm build
