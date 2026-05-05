@@ -19,6 +19,32 @@ APIs are unstable until `1.0.0`.
 
 - _(reserved for the next change)_
 
+## [0.2.0] - F4 Round 2 (remaining §10.4 gates closed)
+
+### Added
+
+- **`SubscribeCapabilities` parity for the in-memory bus.** `InMemoryEventBusOptions` gains an `onError({ phase: "handler", topic })` callback and now catches handler throws so a single bad subscriber no longer blocks dispatch to the rest. Mirrors the redis-pubsub adapter's behavior so swapping bus implementations does not silently change semantics. (Closes tech-debt **M4** in part.)
+- **`waitUntil(predicate, { timeoutMs, intervalMs })` exported from `@llm-feedback-middleware/adapter-conformance`.** Replaces every fixed `setTimeout` wait in the bus conformance suite. Tests poll the predicate every 10ms and exit as soon as it passes; the suite's previous `deliveryWaitMs` option is now `deliveryTimeoutMs` (default 1500ms — a budget, not a hard wait). (Closes tech-debt **M5**.)
+- **Fault-injection conformance test:** "a throwing subscriber does not block other subscribers on the same topic" added to `runEventBusConformance`. (Closes tech-debt **M4** in part.)
+- **`feedback_migrations(filename, applied_at)` tracking table.** New `000-feedback-migrations.sql` runs unconditionally to bootstrap the tracker; subsequent files are applied only if not already in the tracker. `runMigrations` now returns `{ applied: string[], skipped: string[] }`. (Closes tech-debt **D2**.)
+- **`InMemoryEventStoreOptions.maxEvents`.** Optional ring-buffer cap for the in-memory event store; oldest events evicted in append-order. Unbounded by default for backward compat. Construction throws on a non-positive integer. JSDoc warns that eviction breaks the event-sourcing replay contract. 5 new tests. (Closes tech-debt **D4**.)
+- **Bundle-size budgets.** New dependency-free `scripts/check-size.mjs` enforces per-package `dist/index.js` size budgets. Wired into `pnpm size:check` and the CI workflow's Node 22 matrix entry. Initial baselines fit comfortably with 10-20% headroom. (Closes tech-debt **L4**.)
+- **CI Node matrix.** GitHub Actions CI now matrixes against Node 18, 20, and 22 to back the `engines.node >= 18` claim. Lint, format-check, dep-check, and service-container integration tests run on Node 22 only; typecheck and unit tests run on every Node version. (Closes tech-debt **L5**.)
+- **`examples/transactional-side-effect/`.** Demonstrates `eventStore.withTransaction((tx) => { append(event, tx); customAuditInsert(tx); })` for atomic capture + consumer-side write. Verifies rollback semantics by simulating a constraint violation in the audit insert and asserting neither the audit row nor the framework event is durable. (Closes tech-debt **L6**.)
+- **Postgres outbox-scanner advisory-lock leader-election test.** New `outbox-scanner-leader.test.ts` races two scanners with the same `lockKey` and asserts every event is published exactly once across the union. Gated on `FEEDBACK_TEST_DATABASE_URL` so it only runs in CI. (Closes tech-debt **N2**.)
+- **Linkage CI workflow (`.github/workflows/linkage.yml`).** Packs every framework package into a `.tgz`, installs them into a scratch consumer directory via `npm install`, and runs a smoke script that imports `core` + `in-memory` from the packed artifacts. Catches drift between workspace-source typecheck and actual published surface (`tsup` config gaps, missing `package.json#exports`, dropped types). (Closes tech-debt **M6**.)
+
+### Changed
+
+- **`runMigrations` return shape.** Now returns `{ applied: string[]; skipped: string[] }` instead of `{ applied: string[] }`. Existing consumers that destructure `.applied` continue to work; `.skipped` is additive.
+- **`createInMemoryEventBus`** now catches handler throws by default. Previously a thrown handler propagated through `publish()`. The new behavior matches the redis-pubsub adapter (silent by default, surface via `onError` if you opt in). Consumers that relied on `publish()` throwing on handler errors should pass an `onError` callback.
+
+### Notes
+
+- 25 of 26 tech-debt items now resolved. **H5** (per-topic publish atomicity for at-least-once buses) remains deferred until a Kafka or Streams adapter ships — it does not affect the current Redis pub/sub default.
+- All §10.4 gates closed. Per §10.5, the framework can publish at v1.0.0 once CI green for 7 days + smoke test against fresh `npm install` + 2 external reviewers all pass.
+- Verification: 222 unit tests pass (129 core + 81 in-memory + 4 streams + 8 reference) — Postgres + redis-pubsub + linkage tests run in CI. Lint, format, typecheck, depcheck, and bundle-size budgets all clean across 7 packages.
+
 ## [0.1.0] - F4 Round 1 (initial public release)
 
 ### Added

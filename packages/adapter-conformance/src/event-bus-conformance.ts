@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { EventBusPort } from "@llm-feedback-middleware/core";
 import { makeEvent } from "./test-fixtures.js";
+import { waitUntil } from "./poll.js";
 
 export interface EventBusConformanceOptions {
   name: string;
@@ -12,13 +13,19 @@ export interface EventBusConformanceOptions {
    * Default true. Adapters without wildcard support skip those tests.
    */
   supportsWildcards?: boolean;
-  /** How long to wait for async delivery in tests. Default 50ms. */
-  deliveryWaitMs?: number;
+  /**
+   * Maximum time the suite will wait for an event to be delivered before
+   * declaring failure. Default 1500ms. Replaces the earlier fixed-wait
+   * `setTimeout(50)` approach which produced flaky CI failures on slow
+   * runners. Tests poll the predicate every 10ms and exit as soon as it
+   * passes, so the budget is a ceiling rather than a hard wait.
+   */
+  deliveryTimeoutMs?: number;
 }
 
 export function runEventBusConformance(options: EventBusConformanceOptions): void {
   const supportsWildcards = options.supportsWildcards ?? true;
-  const wait = options.deliveryWaitMs ?? 50;
+  const timeoutMs = options.deliveryTimeoutMs ?? 1500;
   const suite = options.skip ? describe.skip : describe;
 
   suite(`EventBusPort conformance: ${options.name}`, () => {
@@ -39,7 +46,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       });
       try {
         await bus.publish("feedback.captured", makeEvent({ event_id: "e1" }));
-        await new Promise((r) => setTimeout(r, wait));
+        await waitUntil(() => received.includes("e1"), { timeoutMs });
         expect(received).toContain("e1");
       } finally {
         await unsub();
@@ -48,15 +55,22 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
 
     it("subscriber does not receive events on different topics", async () => {
       const received: string[] = [];
+      const otherReceived: string[] = [];
       const unsub = bus.subscribe("feedback.captured.explicit.positive", async (e) => {
         received.push(e.event_id);
       });
+      // Probe subscriber on the actual published topic so we can wait until
+      // delivery has happened; without this we'd be waiting blind.
+      const unsubProbe = bus.subscribe("feedback.captured.explicit.negative", async (e) => {
+        otherReceived.push(e.event_id);
+      });
       try {
         await bus.publish("feedback.captured.explicit.negative", makeEvent({ event_id: "neg" }));
-        await new Promise((r) => setTimeout(r, wait));
+        await waitUntil(() => otherReceived.includes("neg"), { timeoutMs });
         expect(received).not.toContain("neg");
       } finally {
         await unsub();
+        await unsubProbe();
       }
     });
 
@@ -71,7 +85,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       });
       try {
         await bus.publish("feedback.captured", makeEvent({ event_id: "shared" }));
-        await new Promise((r) => setTimeout(r, wait));
+        await waitUntil(() => a.includes("shared") && b.includes("shared"), { timeoutMs });
         expect(a).toContain("shared");
         expect(b).toContain("shared");
       } finally {
@@ -88,6 +102,11 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
           received.push(e.event_id);
         },
       );
+      // Probe to know when the negative publish has been processed by the bus.
+      const negSeen: string[] = [];
+      const unsubProbe = bus.subscribe("feedback.captured.explicit.negative", async (e) => {
+        negSeen.push(e.event_id);
+      });
       try {
         await bus.publish(
           "feedback.captured.explicit.positive",
@@ -106,12 +125,19 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
             action: "reject",
           }),
         );
-        await new Promise((r) => setTimeout(r, wait));
+        await waitUntil(
+          () =>
+            received.includes("exp-pos") &&
+            received.includes("imp-pos") &&
+            negSeen.includes("exp-neg"),
+          { timeoutMs },
+        );
         expect(received).toContain("exp-pos");
         expect(received).toContain("imp-pos");
         expect(received).not.toContain("exp-neg");
       } finally {
         await unsub();
+        await unsubProbe();
       }
     });
 
@@ -121,12 +147,23 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
         received.push(e.event_id);
       });
       await bus.publish("feedback.captured", makeEvent({ event_id: "before" }));
-      await new Promise((r) => setTimeout(r, wait));
+      await waitUntil(() => received.includes("before"), { timeoutMs });
       await unsub();
-      await bus.publish("feedback.captured", makeEvent({ event_id: "after" }));
-      await new Promise((r) => setTimeout(r, wait));
-      expect(received).toContain("before");
-      expect(received).not.toContain("after");
+      // After unsubscribing, install a probe so we can detect when the
+      // next publish has reached the bus, then assert the original
+      // subscriber never saw it.
+      const probe: string[] = [];
+      const unsubProbe = bus.subscribe("feedback.captured", async (e) => {
+        probe.push(e.event_id);
+      });
+      try {
+        await bus.publish("feedback.captured", makeEvent({ event_id: "after" }));
+        await waitUntil(() => probe.includes("after"), { timeoutMs });
+        expect(received).toContain("before");
+        expect(received).not.toContain("after");
+      } finally {
+        await unsubProbe();
+      }
     });
 
     it("preserves payload through the bus", async () => {
@@ -137,10 +174,40 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       try {
         const payload = { foo: "bar", arr: [1, 2, 3], nested: { ok: true } };
         await bus.publish("feedback.captured", makeEvent({ event_id: "e1", payload }));
-        await new Promise((r) => setTimeout(r, wait));
+        await waitUntil(() => captured !== null, { timeoutMs });
         expect(captured).toEqual(payload);
       } finally {
         await unsub();
+      }
+    });
+
+    it("a throwing subscriber does not block other subscribers on the same topic", async () => {
+      // Fault-injection scenario: one handler throws every time. Other
+      // handlers on the same topic must still receive events; the throwing
+      // handler's events must surface through the adapter's onError
+      // callback (or be absorbed but not block other dispatches).
+      const goodA: string[] = [];
+      const goodB: string[] = [];
+      const unsubBad = bus.subscribe("feedback.captured", async () => {
+        throw new Error("intentional handler failure for fault-injection conformance");
+      });
+      const unsubA = bus.subscribe("feedback.captured", async (e) => {
+        goodA.push(e.event_id);
+      });
+      const unsubB = bus.subscribe("feedback.captured", async (e) => {
+        goodB.push(e.event_id);
+      });
+      try {
+        await bus.publish("feedback.captured", makeEvent({ event_id: "fault-1" }));
+        await waitUntil(() => goodA.includes("fault-1") && goodB.includes("fault-1"), {
+          timeoutMs,
+        });
+        expect(goodA).toContain("fault-1");
+        expect(goodB).toContain("fault-1");
+      } finally {
+        await unsubBad();
+        await unsubA();
+        await unsubB();
       }
     });
 
@@ -156,7 +223,9 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
             "feedback.captured.implicit",
             makeEvent({ event_id: "imp", source: "implicit" }),
           );
-          await new Promise((r) => setTimeout(r, wait));
+          await waitUntil(() => received.includes("exp") && received.includes("imp"), {
+            timeoutMs,
+          });
           expect(received).toContain("exp");
           expect(received).toContain("imp");
         } finally {

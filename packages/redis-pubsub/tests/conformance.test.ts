@@ -34,7 +34,7 @@ if (skip) {
       // The factory casts back to the typed object that has close(); call it.
       await (adapter as { close?: () => Promise<void> }).close?.();
     },
-    deliveryWaitMs: 200,
+    deliveryTimeoutMs: 2000,
   });
 
   afterAll(async () => {

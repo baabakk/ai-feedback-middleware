@@ -14,6 +14,19 @@ const CAPABILITIES: SubscribeCapabilities = {
   fromPositions: ["latest"],
 };
 
+export interface InMemoryEventBusOptions {
+  /**
+   * Optional error callback fired when a subscriber handler throws. Default:
+   * silent. Mirrors the redis-pubsub adapter's `onError`. Wire to a logger
+   * or metrics system to gain visibility into subscriber failures.
+   *
+   * The bus continues dispatching to remaining subscribers even when one
+   * throws — fault isolation matches the redis-pubsub adapter so swapping
+   * implementations does not silently change semantics.
+   */
+  onError?: (err: unknown, context: { phase: "handler"; topic: string }) => void;
+}
+
 interface Subscription {
   patterns: string[];
   handler: (event: FeedbackEvent, topic: string) => Promise<void>;
@@ -27,31 +40,34 @@ interface Subscription {
  * Designed for tests and toy single-node deployments. No durability, no
  * cross-process delivery, no backpressure.
  */
-export function createInMemoryEventBus(): EventBusPort {
+export function createInMemoryEventBus(options: InMemoryEventBusOptions = {}): EventBusPort {
   const subscriptions = new Set<Subscription>();
+  const onError = options.onError;
+
+  async function dispatch(topic: string, event: FeedbackEvent): Promise<void> {
+    for (const sub of subscriptions) {
+      for (const pattern of sub.patterns) {
+        if (matchesTopic(pattern, topic)) {
+          try {
+            await sub.handler(event, topic);
+          } catch (err) {
+            // Surface but do not let a single bad handler stop the others.
+            if (onError) onError(err, { phase: "handler", topic });
+          }
+          break;
+        }
+      }
+    }
+  }
 
   return {
     async publish(topic: string, event: FeedbackEvent): Promise<void> {
-      for (const sub of subscriptions) {
-        for (const pattern of sub.patterns) {
-          if (matchesTopic(pattern, topic)) {
-            await sub.handler(event, topic);
-            break;
-          }
-        }
-      }
+      await dispatch(topic, event);
     },
 
     async publishBatch(topic: string, events: FeedbackEvent[]): Promise<void> {
       for (const event of events) {
-        for (const sub of subscriptions) {
-          for (const pattern of sub.patterns) {
-            if (matchesTopic(pattern, topic)) {
-              await sub.handler(event, topic);
-              break;
-            }
-          }
-        }
+        await dispatch(topic, event);
       }
     },
 

@@ -127,6 +127,28 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  examples/transactional-side-effect:
+    dependencies:
+      '@llm-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@llm-feedback-middleware/postgres':
+        specifier: workspace:*
+        version: link:../../packages/postgres
+      pg:
+        specifier: ^8.13.1
+        version: 8.20.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/adapter-conformance:
     dependencies:
       '@llm-feedback-middleware/core':

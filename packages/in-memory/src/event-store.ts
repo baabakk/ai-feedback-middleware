@@ -8,6 +8,19 @@ import type {
 export interface InMemoryEventStoreOptions {
   /** Optional initial events (useful for tests). */
   seed?: FeedbackEvent[];
+  /**
+   * Optional ring-buffer cap. When set, the store keeps at most `maxEvents`
+   * entries; oldest events are evicted in append-order to make room. Defaults
+   * to unbounded.
+   *
+   * **Use with care.** Eviction breaks the event-sourcing replay contract:
+   * once an event has been evicted, projections rebuilt from the log will
+   * be incomplete. The in-memory store is intended for tests and toy
+   * single-process deployments; for any production workload that relies on
+   * replay, use the Postgres adapter (or another durable adapter that
+   * implements `EventStorePort` without eviction).
+   */
+  maxEvents?: number;
 }
 
 interface StoredEvent {
@@ -16,11 +29,26 @@ interface StoredEvent {
 }
 
 export function createInMemoryEventStore(options: InMemoryEventStoreOptions = {}): EventStorePort {
+  const maxEvents = options.maxEvents;
+  if (maxEvents !== undefined && (!Number.isInteger(maxEvents) || maxEvents <= 0)) {
+    throw new Error(
+      `createInMemoryEventStore: maxEvents must be a positive integer, got ${String(maxEvents)}`,
+    );
+  }
   const events: StoredEvent[] = (options.seed ?? []).map((e, idx) => ({
     event: e,
     position: idx + 1,
   }));
   let nextPosition = events.length + 1;
+
+  function maybeEvict(): void {
+    if (maxEvents === undefined) return;
+    while (events.length > maxEvents) {
+      events.shift();
+    }
+  }
+  // Apply cap to a seeded set as well so the invariant holds from t0.
+  maybeEvict();
 
   const subscribers = new Set<(event: FeedbackEvent) => Promise<void>>();
 
@@ -50,6 +78,7 @@ export function createInMemoryEventStore(options: InMemoryEventStoreOptions = {}
 
     async append(event: FeedbackEvent): Promise<void> {
       events.push({ event, position: nextPosition++ });
+      maybeEvict();
       // Notify subscribers serially so handler errors propagate predictably in tests.
       for (const handler of subscribers) {
         await handler(event);
@@ -59,6 +88,7 @@ export function createInMemoryEventStore(options: InMemoryEventStoreOptions = {}
     async appendBatch(batch: FeedbackEvent[]): Promise<void> {
       for (const event of batch) {
         events.push({ event, position: nextPosition++ });
+        maybeEvict();
         for (const handler of subscribers) {
           await handler(event);
         }

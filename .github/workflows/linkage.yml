@@ -1,0 +1,111 @@
+name: Linkage check
+
+# Catches drift between the workspace-source typecheck (which adapters get
+# via symlink during local dev) and the actual published artifact a
+# downstream consumer installs from npm. Without this gate, a `tsup` config
+# that strips a type or a missing export from `package.json#exports` only
+# surfaces after publish.
+#
+# Approach: pack every framework package into a .tgz, install them into a
+# scratch directory via npm, then run the minimal example against the
+# installed artifacts. If any package's dist surface is incomplete or
+# inconsistent, the example fails to build.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  linkage:
+    name: Pack + install + smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Pack all framework packages
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/feedback-tarballs
+          for pkg in core in-memory postgres redis-pubsub streams reference adapter-conformance; do
+            tarball=$(pnpm --filter "@llm-feedback-middleware/$pkg" pack --pack-destination /tmp/feedback-tarballs | tail -1)
+            echo "Packed $pkg: $tarball"
+          done
+          ls -lh /tmp/feedback-tarballs/
+
+      - name: Install packed artifacts in a scratch consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/scratch && cd /tmp/scratch
+          npm init -y >/dev/null
+          # Set type=module so the ESM-only artifacts work.
+          node -e "const p=require('./package.json');p.type='module';require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2))"
+          for tarball in /tmp/feedback-tarballs/*.tgz; do
+            npm install --no-save "$tarball"
+          done
+          npm install --no-save zod
+          ls node_modules/@llm-feedback-middleware/
+
+      - name: Run minimal smoke against installed artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/scratch/smoke.mjs <<'EOF'
+          import { createFeedback, DEFAULT_ACTIONS, matchesTopic } from "@llm-feedback-middleware/core";
+          import {
+            createInMemoryEventStore,
+            createInMemoryProjectionStore,
+          } from "@llm-feedback-middleware/in-memory";
+
+          const feedback = createFeedback({
+            eventStore: createInMemoryEventStore(),
+            projectionStore: createInMemoryProjectionStore(),
+            actions: DEFAULT_ACTIONS,
+            artifactTypes: [{ name: "draft" }],
+          });
+
+          await feedback.capture({
+            action: "approve",
+            artifact_type: "draft",
+            artifact_id: "draft-1",
+            artifact_version: 1,
+            producer: "smoke-test",
+            task_type: "linkage_check",
+            payload: {},
+          });
+
+          const events = [];
+          for await (const e of feedback.readStream("draft-1")) events.push(e);
+          if (events.length !== 1) {
+            console.error(`Expected 1 event, got ${events.length}`);
+            process.exit(1);
+          }
+          if (!matchesTopic("feedback.>", "feedback.captured.explicit")) {
+            console.error("matchesTopic linkage broken");
+            process.exit(1);
+          }
+          console.log("Linkage smoke OK: imported core + in-memory from packed tarballs and round-tripped one event.");
+          EOF
+          cd /tmp/scratch && node smoke.mjs

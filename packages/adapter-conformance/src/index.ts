@@ -20,3 +20,4 @@ export {
   type InferenceRulesConformanceOptions,
 } from "./inference-rules-conformance.js";
 export { makeEvent, collect } from "./test-fixtures.js";
+export { waitUntil } from "./poll.js";

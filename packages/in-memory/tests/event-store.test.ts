@@ -118,4 +118,55 @@ describe("InMemoryEventStore", () => {
     const events = await collect(store.readStream("p-1"));
     expect(events.map((e) => e.event_id)).toEqual(["seed1", "seed2"]);
   });
+
+  describe("maxEvents eviction", () => {
+    it("evicts oldest events past the cap", async () => {
+      const store = createInMemoryEventStore({ maxEvents: 3 });
+      for (const id of ["e1", "e2", "e3", "e4", "e5"]) {
+        await store.append(makeEvent({ event_id: id }));
+      }
+      const events = await collect(store.readStream("p-1"));
+      expect(events.map((e) => e.event_id)).toEqual(["e3", "e4", "e5"]);
+    });
+
+    it("trims a seed that already exceeds the cap", async () => {
+      const store = createInMemoryEventStore({
+        maxEvents: 2,
+        seed: [
+          makeEvent({ event_id: "old1" }),
+          makeEvent({ event_id: "old2" }),
+          makeEvent({ event_id: "old3" }),
+        ],
+      });
+      const events = await collect(store.readStream("p-1"));
+      expect(events.map((e) => e.event_id)).toEqual(["old2", "old3"]);
+    });
+
+    it("evicts during appendBatch", async () => {
+      const store = createInMemoryEventStore({ maxEvents: 2 });
+      await store.appendBatch([
+        makeEvent({ event_id: "a" }),
+        makeEvent({ event_id: "b" }),
+        makeEvent({ event_id: "c" }),
+        makeEvent({ event_id: "d" }),
+      ]);
+      const events = await collect(store.readStream("p-1"));
+      expect(events.map((e) => e.event_id)).toEqual(["c", "d"]);
+    });
+
+    it("rejects non-positive maxEvents at construction", () => {
+      expect(() => createInMemoryEventStore({ maxEvents: 0 })).toThrow(/positive integer/);
+      expect(() => createInMemoryEventStore({ maxEvents: -5 })).toThrow(/positive integer/);
+      expect(() => createInMemoryEventStore({ maxEvents: 1.5 })).toThrow(/positive integer/);
+    });
+
+    it("is unbounded by default", async () => {
+      const store = createInMemoryEventStore();
+      for (let i = 0; i < 100; i++) {
+        await store.append(makeEvent({ event_id: `e${i}` }));
+      }
+      const events = await collect(store.readStream("p-1"));
+      expect(events.length).toBe(100);
+    });
+  });
 });

@@ -8,9 +8,21 @@ on:
 
 jobs:
   ci:
+    # Run the full integration matrix on Node 22, then a leaner test pass on
+    # 18 and 20 to back the engines field's `>= 18` claim. The lean pass
+    # skips service-container tests because adding the matrix would multiply
+    # CI minutes without catching anything Node-specific.
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22]
+
     runs-on: ubuntu-latest
 
     services:
+      # Service containers are present on every matrix entry but are only
+      # used by the Node 22 entry's full integration tests. Other entries
+      # skip the service-container tests via the `if:` guards below.
       postgres:
         image: postgres:16
         env:
@@ -51,7 +63,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: pnpm
 
       - name: Install dependencies
@@ -64,9 +76,11 @@ jobs:
         run: pnpm --filter @llm-feedback-middleware/adapter-conformance build
 
       - name: Lint
+        if: matrix.node-version == 22
         run: pnpm lint
 
       - name: Format check
+        if: matrix.node-version == 22
         run: pnpm format:check
 
       - name: Typecheck
@@ -75,14 +89,24 @@ jobs:
       - name: Test (in-memory + core)
         run: pnpm --filter @llm-feedback-middleware/core --filter @llm-feedback-middleware/in-memory test
 
+      - name: Test (streams + reference)
+        run: pnpm --filter @llm-feedback-middleware/streams --filter @llm-feedback-middleware/reference test
+
       - name: Test (postgres, against service container)
+        if: matrix.node-version == 22
         run: pnpm --filter @llm-feedback-middleware/postgres test
 
       - name: Test (redis-pubsub, against service container)
+        if: matrix.node-version == 22
         run: pnpm --filter @llm-feedback-middleware/redis-pubsub test
 
       - name: Dependency boundaries
+        if: matrix.node-version == 22
         run: pnpm depcheck
 
       - name: Build all packages
         run: pnpm build
+
+      - name: Bundle-size budgets
+        if: matrix.node-version == 22
+        run: pnpm size:check
