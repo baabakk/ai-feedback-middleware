@@ -7,6 +7,59 @@ export interface SubscribeOptions {
   fromPosition?: string | "earliest" | "latest";
 }
 
+/**
+ * Capability descriptor an adapter declares so callers can validate
+ * `SubscribeOptions` at registration time. Adapters whose underlying
+ * transport does not support a given option set must throw early via
+ * `assertSupportedSubscribeOptions` so that broken consumer assumptions
+ * surface immediately rather than silently misbehaving in production.
+ *
+ * @see assertSupportedSubscribeOptions
+ */
+export interface SubscribeCapabilities {
+  /** Delivery semantics the adapter actually supports. */
+  deliveryModes: ReadonlyArray<NonNullable<SubscribeOptions["deliveryMode"]>>;
+  /** Cursor positions the adapter actually supports. */
+  fromPositions: ReadonlyArray<NonNullable<SubscribeOptions["fromPosition"]>>;
+  /** Human-readable adapter name for error messages. */
+  adapterName: string;
+}
+
+/**
+ * Validate consumer-supplied `SubscribeOptions` against an adapter's declared
+ * capabilities. Throws a descriptive error when a consumer asks for something
+ * the adapter cannot honor (e.g. `at-least-once` on Redis pub/sub).
+ *
+ * Adapters should call this from `subscribe()` before installing the handler.
+ *
+ * Default values (`at-most-once`, `latest`) and undefined options always pass.
+ */
+export function assertSupportedSubscribeOptions(
+  options: SubscribeOptions | undefined,
+  capabilities: SubscribeCapabilities,
+): void {
+  if (!options) return;
+  if (options.deliveryMode !== undefined) {
+    if (!capabilities.deliveryModes.includes(options.deliveryMode)) {
+      throw new Error(
+        `${capabilities.adapterName} does not support deliveryMode="${options.deliveryMode}". ` +
+          `Supported: [${capabilities.deliveryModes.join(", ")}]. ` +
+          `Use a different bus adapter (e.g. Kafka, Redis Streams) for at-least-once.`,
+      );
+    }
+  }
+  if (options.fromPosition !== undefined) {
+    const wellKnown = options.fromPosition === "earliest" || options.fromPosition === "latest";
+    if (wellKnown && !capabilities.fromPositions.includes(options.fromPosition)) {
+      throw new Error(
+        `${capabilities.adapterName} does not support fromPosition="${options.fromPosition}". ` +
+          `Supported well-known positions: [${capabilities.fromPositions.join(", ")}]. ` +
+          `For arbitrary cursors, the adapter must support a string position.`,
+      );
+    }
+  }
+}
+
 export type Unsubscribe = () => Promise<void>;
 
 /**

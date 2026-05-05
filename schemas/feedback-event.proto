@@ -1,0 +1,84 @@
+// Protobuf definition for FeedbackEvent.
+//
+// Source of truth for the schema lives in
+// `packages/core/src/event-types.ts` (Zod). This .proto is regenerated when
+// the Zod schema changes; see `schemas/generate.ts`.
+//
+// Use this file to wire the framework into language ecosystems other than
+// Node (Go, Rust, Python, Java) so cross-system event consumers can decode
+// canonical events without depending on the TypeScript types.
+//
+// The framework itself does not require protobuf. The wire format inside
+// the event store and on the bus is JSON. This file is purely an external
+// integration artifact.
+
+syntax = "proto3";
+
+package llm_feedback_middleware.v1;
+
+option go_package = "github.com/baabakk/llm-feedback-middleware/proto/feedback/v1;feedbackv1";
+
+// Source: how the feedback was produced.
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  SOURCE_EXPLICIT = 1;
+  SOURCE_IMPLICIT = 2;
+}
+
+// Polarity: the sign of the feedback signal.
+enum Polarity {
+  POLARITY_UNSPECIFIED = 0;
+  POLARITY_POSITIVE = 1;
+  POLARITY_NEGATIVE = 2;
+  POLARITY_NEUTRAL = 3;
+}
+
+// Inference: the framework's classification of the event.
+enum Inference {
+  INFERENCE_UNSPECIFIED = 0;
+  INFERENCE_WHITELIST = 1;
+  INFERENCE_BLACKLIST = 2;
+  INFERENCE_OBSERVE = 3;
+}
+
+// Where the event came from at the transport layer.
+message Provenance {
+  string channel = 1;
+  string instance_id = 2;
+  double latency_ms = 3;
+  string captured_by_adapter = 4;
+}
+
+// The canonical FeedbackEvent.
+message FeedbackEvent {
+  string event_id = 1;
+  uint32 event_version = 2;
+
+  // ISO 8601 timestamp strings to match the JSON schema.
+  string timestamp = 3;
+  string captured_at = 4;
+
+  string partition_key = 5;
+
+  Source source = 6;
+  Polarity polarity = 7;
+  Inference inference = 8;
+  string action = 9;
+
+  string artifact_type = 10;
+  string artifact_id = 11;
+  uint32 artifact_version = 12;
+  string producer = 13;
+  string task_type = 14;
+
+  // Action-specific payload. The framework validates this against the
+  // action's Zod schema; over the wire, it is opaque JSON in a string field.
+  // Decoders should `JSON.parse(payload_json)` to inspect.
+  string payload_json = 15;
+
+  Provenance provenance = 16;
+
+  // Optional fields.
+  string correction_of = 17;
+  repeated string correlates_with = 18;
+}

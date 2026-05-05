@@ -1,0 +1,79 @@
+name: Bug report
+description: Something isn't working as documented.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. The more concrete the
+        reproduction, the faster we can fix it.
+
+        For security issues, please **do not** file a public issue. See
+        [SECURITY.md](../SECURITY.md) for private-disclosure instructions.
+
+  - type: input
+    id: package
+    attributes:
+      label: Affected package(s)
+      description: e.g. @llm-feedback-middleware/core, @llm-feedback-middleware/postgres
+      placeholder: "@llm-feedback-middleware/core"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version(s)
+      description: Output of `pnpm list @llm-feedback-middleware/core` (or your equivalent).
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: Output of `node --version`.
+      placeholder: "v20.11.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Code snippet or link to a small repository that reproduces the issue.
+        We can help most when we can run the failing case locally.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / stack traces
+      description: Paste any error output. Redact secrets first.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Anything else worth knowing (deployment shape, adapter mix, scale, etc.).

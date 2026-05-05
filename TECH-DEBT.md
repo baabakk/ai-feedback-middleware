@@ -1,6 +1,6 @@
 # `llm-feedback-middleware` Tech Debt Tracker
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-05-05 (F4 Round 1 closures)
 
 This file tracks known tech debt across the framework. Each item has:
 
@@ -165,15 +165,12 @@ JSDoc on the option marks it "STRONGLY RECOMMENDED for multi-instance deployment
 
 ### D1: Bus pattern matcher duplicated
 
-**Status:** Open
-**Affected:**
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`packages/core/src/topic-matcher.ts`](packages/core/src/topic-matcher.ts), [`packages/in-memory/src/event-bus.ts`](packages/in-memory/src/event-bus.ts), [`packages/redis-pubsub/src/event-bus.ts`](packages/redis-pubsub/src/event-bus.ts)
 
-- [`packages/in-memory/src/event-bus.ts`](packages/in-memory/src/event-bus.ts) — local `matches` function
-- [`packages/redis-pubsub/src/event-bus.ts`](packages/redis-pubsub/src/event-bus.ts) — local `matchesLocal` function
+**Resolution.** Shipped `matchesTopic` in core as the single source of truth for the framework's `*` (single-segment) and `>` (NATS-style tail, one-or-more remaining) wildcard semantics. `#` is accepted as a synonym for `>`. Both bus adapters import and call the shared function. 14 tests in [`packages/core/tests/topic-matcher.test.ts`](packages/core/tests/topic-matcher.test.ts) cover exact match, single-segment `*`, tail `>`, `#` synonym, combined wildcards, and the partial-segment-not-supported case.
 
-**Problem.** Both adapters implement the framework's `*` and `>` topic-pattern semantics independently. Any new bus adapter needs the same code.
-
-**Resolution.** Hoist to `packages/core/src/topic-matcher.ts` as a shared pure function. Update both adapters to import.
+**Behavior change.** The previous in-memory matcher returned true for `>` even when there were no remaining segments to match (so `feedback.>` matched `feedback`). The shared matcher follows the spec and NATS convention: `>` requires at least one remaining segment. None of the framework's canonical topics fall foul of this since they all have at least two segments after the leading `feedback`.
 
 ---
 
@@ -199,6 +196,7 @@ JSDoc on the option marks it "STRONGLY RECOMMENDED for multi-instance deployment
 **Affected:** [`packages/core/src/upcaster.ts`](packages/core/src/upcaster.ts), [`packages/core/src/create-feedback.ts`](packages/core/src/create-feedback.ts)
 
 **Resolution.** Shipped:
+
 - `EventUpcaster` interface (`fromVersion`, `toVersion`, `upcast(event)`)
 - `validateUpcasterChain` — boot-time check for contiguous chain v1 → ... → currentVersion
 - `upcastEvent` and `upcastStream` — pure functions applying the chain
@@ -222,27 +220,19 @@ Schema evolution contract is now backed by code: future minor-version bumps ship
 
 ### D5: SubscribeOptions.deliveryMode and fromPosition ignored
 
-**Status:** Open
-**Affected:** [`packages/in-memory/src/event-bus.ts`](packages/in-memory/src/event-bus.ts), [`packages/redis-pubsub/src/event-bus.ts`](packages/redis-pubsub/src/event-bus.ts)
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`packages/core/src/ports/event-bus-port.ts`](packages/core/src/ports/event-bus-port.ts), [`packages/in-memory/src/event-bus.ts`](packages/in-memory/src/event-bus.ts), [`packages/redis-pubsub/src/event-bus.ts`](packages/redis-pubsub/src/event-bus.ts)
 
-**Problem.** Both adapters accept `SubscribeOptions` but ignore `deliveryMode` and `fromPosition`. Misleading: consumers think they're configuring something.
-
-**Resolution.** Either:
-
-1. Document explicitly that the options are "advisory" and adapters that don't support them ignore.
-2. Throw at registration time when an unsupported option is passed (loud failure).
-
-Recommend (2) for safety.
+**Resolution.** Implemented option (2) — loud failure. Shipped `SubscribeCapabilities` interface + `assertSupportedSubscribeOptions(options, capabilities)` helper in core. Each adapter declares the `deliveryMode` and `fromPosition` values it supports; `subscribe()` throws a descriptive error when the consumer asks for something the adapter cannot honor. Both reference adapters declare `at-most-once` + `latest` only (the actual semantics of in-memory and Redis pub/sub). 5 tests in [`packages/in-memory/tests/subscribe-options.test.ts`](packages/in-memory/tests/subscribe-options.test.ts) verify rejection messages and accepted defaults.
 
 ---
 
 ### D6: `>` wildcard not in framework spec
 
-**Status:** Open
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`A02-Feedback-Middleware-Framework-Spec.md`](../A02-Feedback-Middleware-Framework-Spec.md) §9.2.1
 
-**Problem.** The in-memory bus and redis-pubsub adapter both support `>` as a "match all remaining segments" wildcard (NATS-style). The framework spec only mentions `*`. Inconsistent documentation.
-
-**Resolution.** Either add `>` to the spec or remove it from adapters. Recommend keeping `>` and adding to spec — it's useful and consistent with NATS conventions.
+**Resolution.** Added §9.2.1 "Wildcards" to the framework spec covering both `*` (single-segment) and `>` (NATS-style tail, one-or-more remaining) with worked examples. The new section also points adapter implementers at the shared `matchesTopic` source of truth in `@llm-feedback-middleware/core` and explains the per-adapter pattern of subscribing at the broadest transport-level match plus re-filtering on receive.
 
 ---
 
@@ -250,28 +240,28 @@ Recommend (2) for safety.
 
 ### L1: CHANGELOG.md missing
 
-**Status:** Open
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`CHANGELOG.md`](CHANGELOG.md)
 
-**Resolution.** Changesets generates per-package changelogs on first release. Add a top-level `CHANGELOG.md` that aggregates the story and mark it auto-generated or hand-curated as appropriate.
+**Resolution.** Shipped a top-level `CHANGELOG.md` following Keep-a-Changelog. It aggregates the cross-package narrative (phase boundaries, tech-debt closures, breaking-vs-non-breaking decisions). Per-package changelogs will be auto-generated by Changesets on first release.
 
 ---
 
 ### L2: SECURITY.md missing
 
-**Status:** Open
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`SECURITY.md`](SECURITY.md)
 
-**Resolution.** Standard OSS file with vulnerability reporting instructions. Use GitHub Security Advisories.
+**Resolution.** Shipped `SECURITY.md` with private-disclosure instructions via GitHub Security Advisories or email, supported-version table, target response/triage SLAs, what's in/out of scope, and hardening notes for consumers. The bug-report issue template links to it as the security path.
 
 ---
 
 ### L3: Per-package READMEs incomplete
 
-**Status:** Partial
-**Affected:** `packages/core/`, `packages/adapter-conformance/`
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`packages/core/README.md`](packages/core/README.md), [`packages/adapter-conformance/README.md`](packages/adapter-conformance/README.md)
 
-**Problem.** `core` and `adapter-conformance` have README placeholders. The other packages have substantial READMEs.
-
-**Resolution.** Write proper per-package READMEs covering: install, quickstart, public API surface, link to spec.
+**Resolution.** Both READMEs expanded to cover install, public API surface (every exported symbol grouped by concern), quickstart, design invariants, and link back to the spec. The `adapter-conformance` README also documents which conformance suites cover which ports plus a worked example of wiring one into a third-party adapter's tests.
 
 ---
 
@@ -306,44 +296,41 @@ Recommend (2) for safety.
 
 ### L7: Examples don't shut down cleanly on capture errors
 
-**Status:** Open
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
 **Affected:** [`examples/postgres-redis/src/index.ts`](examples/postgres-redis/src/index.ts), [`examples/postgres-only/src/index.ts`](examples/postgres-only/src/index.ts)
 
-**Problem.** If `feedback.capture` throws, we leak the pool, the bus, and the scanner.
-
-**Resolution.** Wrap in `try/finally` so resources always release.
+**Resolution.** Both examples now wrap their main flow in `try { ... } finally { ... }`. The Postgres pool, Redis bus, outbox scanner, and metrics subscription all release on a thrown capture. The cleanup path itself uses `.catch(() => {})` per resource so a failing teardown does not mask the original error.
 
 ---
 
 ## Summary
 
-| Severity            | Open                          | In Progress | Resolved | Total  |
-| ------------------- | ----------------------------- | ----------- | -------- | ------ |
-| High                | 1 (H5, deferred to Kafka/SQS) | 0           | 4        | 5      |
-| Medium (test rigor) | 3                             | 0           | 3        | 6      |
-| Medium (design)     | 5                             | 0           | 1 (D3)   | 6      |
-| Low (polish)        | 7                             | 0           | 0        | 7      |
-| New (F2.6)          | 2                             | 0           | 0        | 2      |
-| **Total**           | **18**                        | **0**       | **8**    | **26** |
+| Severity            | Open                          | In Progress | Resolved             | Total  |
+| ------------------- | ----------------------------- | ----------- | -------------------- | ------ |
+| High                | 1 (H5, deferred to Kafka/SQS) | 0           | 4 (H1, H2, H3, H4)   | 5      |
+| Medium (test rigor) | 3 (M4, M5, M6)                | 0           | 3 (M1, M2, M3)       | 6      |
+| Medium (design)     | 2 (D2, D4)                    | 0           | 4 (D1, D3, D5, D6)   | 6      |
+| Low (polish)        | 3 (L4, L5, L6)                | 0           | 4 (L1, L2, L3, L7)   | 7      |
+| New (F2.6)          | 1 (N2)                        | 0           | 1 (N1)               | 2      |
+| **Total**           | **10**                        | **0**       | **16**               | **26** |
 
-**Pre-publish gate:** all 18 remaining open items must move to "In Progress" or "Resolved" before v1.0.0 publishes to npm. See [IMPLEMENTATION-PLAN.md §10.4 and §10.5](../A02-Building-a-Learning-Loop-Every-LLM-Output-as-Training-Signal/IMPLEMENTATION-PLAN.md).
+**Pre-publish gate for v1.0.0:** all 10 remaining open items (excluding deferred H5) must move to "In Progress" or "Resolved" before v1.0.0 publishes to npm. See [IMPLEMENTATION-PLAN.md §10.4 and §10.5](../IMPLEMENTATION-PLAN.md). The framework will publish at v0.1.0 (this round) with the remaining gates documented as "known limitations" in CHANGELOG.md, then ship v0.2.0 once Round 2 closes them.
 
-**Recently resolved:**
+**Recently resolved (in chronological order):**
 
 - M1, M2, M3 (test debt) — F2.5, commit `4cbe189`
 - H1, H2, H3, H4 (observability + scaling) — F2.6, commit `005c332`
-- D3 (schema upcaster mechanism) — F3
+- D3 (schema upcaster mechanism) — F3, commit `b1803cf`
+- D1 (shared topic-matcher), D5 (SubscribeOptions validation), D6 (`>` in spec), N1 (make_interval), L1 (CHANGELOG), L2 (SECURITY.md), L3 (per-package READMEs), L7 (try/finally in examples) — F4 Round 1, this commit
 
 ## New tech debt discovered during F2.6
 
 ### N1: Outbox `markFailed` uses string concatenation for interval
 
-**Status:** Open (Low)
-**Affected:** [`packages/postgres/src/outbox.ts`](packages/postgres/src/outbox.ts) — `($3::int || ' milliseconds')::interval`
+**Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
+**Affected:** [`packages/postgres/src/outbox.ts`](packages/postgres/src/outbox.ts)
 
-**Problem.** Postgres interval construction via string concatenation is awkward. Currently safe because `$3` is a parameterized integer (no SQL injection), but a future contributor extending this might introduce risk.
-
-**Resolution.** Switch to `make_interval(secs => $3 / 1000.0)` or use a fully parameterized form. Low priority.
+**Resolution.** Switched to `make_interval(secs => $3::float8 / 1000.0)`. Behavior is identical to the prior `($3::int || ' milliseconds')::interval` form. The new form is type-safe, reads as a parameterized expression, and removes the future-contributor footgun.
 
 ### N2: Advisory-lock leader election not exercised in tests
 

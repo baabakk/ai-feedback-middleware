@@ -1,0 +1,62 @@
+name: Feature request
+description: Suggest a new capability or extension point.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an enhancement. The framework is intentionally
+        small; new surface area is welcome but needs a clear rationale.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What real consumer problem does this solve? (Hypothetical
+        problems are fine to file but harder to prioritize.)
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch the API or behavior. Pseudo-code is fine.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing workarounds, related libraries, or rejected designs.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package would this affect?
+      multiple: true
+      options:
+        - core
+        - in-memory
+        - postgres
+        - redis-pubsub
+        - streams
+        - reference
+        - adapter-conformance
+        - new package
+        - documentation only
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Are you willing to contribute the change?
+      options:
+        - Yes, I can open a PR
+        - Maybe, with guidance
+        - No
+    validations:
+      required: true

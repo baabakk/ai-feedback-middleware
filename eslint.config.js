@@ -41,7 +41,7 @@ export default [
     },
   },
   {
-    files: ["examples/**/*.ts"],
+    files: ["examples/**/*.ts", "schemas/**/*.ts"],
     rules: {
       "no-console": "off",
     },

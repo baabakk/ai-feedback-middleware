@@ -1,5 +1,20 @@
 import { Redis, type RedisOptions } from "ioredis";
-import type { EventBusPort, FeedbackEvent, Unsubscribe } from "@llm-feedback-middleware/core";
+import {
+  type EventBusPort,
+  type FeedbackEvent,
+  type SubscribeCapabilities,
+  type SubscribeOptions,
+  type Unsubscribe,
+  assertSupportedSubscribeOptions,
+  matchesTopic,
+} from "@llm-feedback-middleware/core";
+
+const CAPABILITIES: SubscribeCapabilities = {
+  adapterName: "createRedisPubSubEventBus",
+  // Redis pub/sub is at-most-once with no retention.
+  deliveryModes: ["at-most-once"],
+  fromPositions: ["latest"],
+};
 
 export interface RedisPubSubOptions {
   /**
@@ -55,31 +70,13 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
     }
   >();
 
-  // Local pattern matcher (independent of Redis) for fan-out within a process.
-  function matchesLocal(pattern: string, topic: string): boolean {
-    if (pattern === topic) return true;
-    if (pattern === ">" || pattern === "#") return true;
-    const pSegs = pattern.split(".");
-    const tSegs = topic.split(".");
-    for (let i = 0; i < pSegs.length; i++) {
-      const p = pSegs[i];
-      if (p === ">") return true;
-      if (p === "*") {
-        if (tSegs[i] === undefined) return false;
-        continue;
-      }
-      if (p !== tSegs[i]) return false;
-    }
-    return pSegs.length === tSegs.length;
-  }
-
   // Convert a framework pattern to a Redis PSUBSCRIBE pattern.
   // Redis uses `*` to match anything within a glob; we map our `*` to
   // a single-segment Redis match, and `>` to a multi-segment match.
   function toRedisPattern(pattern: string): string {
     // Replace each segment-level `*` with `*` and `>` with `*` (Redis doesn't
     // distinguish single-segment vs. multi-segment, so we use `*` for both
-    // and rely on local matchesLocal() for accurate fan-out).
+    // and rely on local matchesTopic() for accurate fan-out).
     return prefix + pattern.replace(/>/g, "*");
   }
 
@@ -99,7 +96,7 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
       }
       for (const sub of subscriptions.values()) {
         for (const pat of sub.patterns) {
-          if (matchesLocal(pat, topic)) {
+          if (matchesTopic(pat, topic)) {
             try {
               await sub.handler(event, topic);
             } catch (err) {
@@ -122,7 +119,7 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
       }
       for (const sub of subscriptions.values()) {
         for (const pat of sub.patterns) {
-          if (matchesLocal(pat, topic)) {
+          if (matchesTopic(pat, topic)) {
             try {
               await sub.handler(event, topic);
             } catch (err) {
@@ -151,7 +148,9 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
     subscribe(
       topic: string | string[],
       handler: (event: FeedbackEvent, topic: string) => Promise<void>,
+      options?: SubscribeOptions,
     ): Unsubscribe {
+      assertSupportedSubscribeOptions(options, CAPABILITIES);
       installListener();
       const patterns = Array.isArray(topic) ? topic : [topic];
       const id = Symbol("sub");

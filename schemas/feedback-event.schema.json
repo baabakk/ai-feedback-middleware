@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/baabakk/llm-feedback-middleware/schemas/feedback-event.schema.json",
+  "title": "FeedbackEvent",
+  "description": "Canonical event shape produced by @llm-feedback-middleware/core. Source of truth lives in packages/core/src/event-types.ts (Zod). Regenerate this file via schemas/generate.ts when the Zod schema changes.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_version",
+    "timestamp",
+    "captured_at",
+    "partition_key",
+    "source",
+    "polarity",
+    "inference",
+    "action",
+    "artifact_type",
+    "artifact_id",
+    "artifact_version",
+    "producer",
+    "task_type",
+    "payload",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Globally unique identifier for this event."
+    },
+    "event_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version this event was written against."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the underlying user action occurred (ISO 8601)."
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the framework recorded the event (ISO 8601)."
+    },
+    "partition_key": {
+      "type": "string",
+      "description": "Stream key for ordering. Defaults to artifact_id."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["explicit", "implicit"]
+    },
+    "polarity": {
+      "type": "string",
+      "enum": ["positive", "negative", "neutral"]
+    },
+    "inference": {
+      "type": "string",
+      "enum": ["whitelist", "blacklist", "observe"]
+    },
+    "action": {
+      "type": "string",
+      "description": "Registered action name (e.g. approve, edit, reject, regenerate, expired, silent_accept, disuse)."
+    },
+    "artifact_type": {
+      "type": "string",
+      "description": "Registered artifact type name (e.g. draft, summary, brief)."
+    },
+    "artifact_id": {
+      "type": "string",
+      "description": "Identifier of the artifact this event is about."
+    },
+    "artifact_version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic version of the artifact."
+    },
+    "producer": {
+      "type": "string",
+      "description": "Identifier of the producing agent or component."
+    },
+    "task_type": {
+      "type": "string",
+      "description": "Free-form task category (e.g. email_draft:warm)."
+    },
+    "payload": {
+      "description": "Action-specific payload. Validated against the action's payload schema by the classifier.",
+      "oneOf": [
+        { "type": "object" },
+        { "type": "array" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["channel", "captured_by_adapter"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "type": "string" },
+        "instance_id": { "type": "string" },
+        "latency_ms": { "type": "number" },
+        "captured_by_adapter": { "type": "string" }
+      }
+    },
+    "correction_of": {
+      "type": "string",
+      "description": "event_id of an earlier event this event corrects."
+    },
+    "correlates_with": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "event_ids of related events."
+    }
+  }
+}

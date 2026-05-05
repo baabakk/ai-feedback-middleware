@@ -62,11 +62,15 @@ export function createPostgresOutbox(options: PostgresOutboxOptions): OutboxPort
     },
 
     async markFailed(eventId: string, error: string, nextAttemptInMs: number): Promise<void> {
+      // make_interval(secs => ...) is the parameterized, type-safe way to add
+      // a Postgres interval. Avoids the previous string-concat approach
+      // (`($3::int || ' milliseconds')::interval`) which read like SQL
+      // injection bait even though it was bound-parameter-safe.
       await pool.query(
         `UPDATE ${table}
          SET attempt_count = attempt_count + 1,
              last_error = $2,
-             next_attempt_at = NOW() + ($3::int || ' milliseconds')::interval
+             next_attempt_at = NOW() + make_interval(secs => $3::float8 / 1000.0)
          WHERE event_id = $1`,
         [eventId, error, nextAttemptInMs],
       );

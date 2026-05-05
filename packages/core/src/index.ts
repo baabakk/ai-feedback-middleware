@@ -38,6 +38,9 @@ export { classify, type ClassifierContext } from "./classifier.js";
 // Inference engine
 export { evaluateRules, type InferenceContext } from "./inference-engine.js";
 
+// Topic-pattern matcher (for adapters that need to filter on receive)
+export { matchesTopic } from "./topic-matcher.js";
+
 // Schema upcasters
 export {
   type EventUpcaster,
@@ -56,8 +59,12 @@ export { ProjectionEngine, type ProjectionBuilder } from "./projection-engine.js
 export type { EventStorePort, Transaction } from "./ports/event-store-port.js";
 export type { ProjectionStorePort } from "./ports/projection-store-port.js";
 export type { FeedbackPort, RebuildResult, Unsubscribe } from "./ports/feedback-port.js";
-export type { EventBusPort, SubscribeOptions } from "./ports/event-bus-port.js";
-export { topicsFor } from "./ports/event-bus-port.js";
+export type {
+  EventBusPort,
+  SubscribeOptions,
+  SubscribeCapabilities,
+} from "./ports/event-bus-port.js";
+export { topicsFor, assertSupportedSubscribeOptions } from "./ports/event-bus-port.js";
 export type { DedupeStorePort } from "./ports/dedupe-store-port.js";
 export type { MetricsPort } from "./ports/metrics-port.js";
 export { noopMetrics } from "./ports/metrics-port.js";
