@@ -39,7 +39,55 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.17)
 
+  examples/daily-briefing-silent-accept:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  examples/email-draft-approval:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   examples/minimal-nodejs:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  examples/multi-tenant-feedback:
     dependencies:
       '@ai-feedback-middleware/core':
         specifier: workspace:*
@@ -105,6 +153,41 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  examples/regenerate-burst-tuning:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  examples/slack-approval-bot:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
+      '@ai-feedback-middleware/reference':
+        specifier: workspace:*
+        version: link:../../packages/reference
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   examples/threshold-crystallization:
     dependencies:
       '@ai-feedback-middleware/core':
@@ -119,6 +202,22 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  examples/topk-rag-selection:
+    dependencies:
+      '@ai-feedback-middleware/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ai-feedback-middleware/in-memory':
+        specifier: workspace:*
+        version: link:../../packages/in-memory
     devDependencies:
       tsx:
         specifier: ^4.19.2
