@@ -40,11 +40,11 @@ pnpm --filter regenerate-burst-tuning start
 
 ## Adapt it
 
-| Pattern | Rule shape |
-|---|---|
-| "5 manual edits in a week → content needs attention" | `applies_when.action = "manually_edited"`, `axis = "content"`, `threshold = 5`, `window_ms = 7 * 24 * 60 * 60 * 1000` |
-| "3 `mute_triggered` on a notification channel → channel is wrong" | `applies_when.action = "mute_triggered"`, `axis = "channel"`, `threshold = 3` |
-| "10 `silently_accepted` in a row → trust this (producer, task_type) more" | `applies_when.action = "silently_accepted"`, `axis = "content"`, `result_if_met = "actionable_positive"` |
+| Pattern                                                                   | Rule shape                                                                                                            |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| "5 manual edits in a week → content needs attention"                      | `applies_when.action = "manually_edited"`, `axis = "content"`, `threshold = 5`, `window_ms = 7 * 24 * 60 * 60 * 1000` |
+| "3 `mute_triggered` on a notification channel → channel is wrong"         | `applies_when.action = "mute_triggered"`, `axis = "channel"`, `threshold = 3`                                         |
+| "10 `silently_accepted` in a row → trust this (producer, task_type) more" | `applies_when.action = "silently_accepted"`, `axis = "content"`, `result_if_met = "actionable_positive"`              |
 
 The four axes (`detection` / `content` / `timing` / `channel`) are the levers — each one corresponds to a different remediation: detection → review the trigger rules, content → review the prompt, timing → review scheduling, channel → review delivery routing.
 
@@ -56,7 +56,10 @@ In a real deployment you'd subscribe to the per-axis topic rather than polling `
 await eventBus.subscribe(
   "feedback.inference.content.actionable_negative.draft_email",
   async (decision) => {
-    await promptTuningQueue.enqueue({ rule: decision.rule_id, evidence: decision.evidence_event_ids });
+    await promptTuningQueue.enqueue({
+      rule: decision.rule_id,
+      evidence: decision.evidence_event_ids,
+    });
   },
 );
 ```

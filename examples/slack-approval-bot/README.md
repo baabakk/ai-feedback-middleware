@@ -47,12 +47,12 @@ pnpm --filter slack-approval-bot start
 
 ## Adapt it
 
-| Source | What changes |
-|---|---|
-| **Telegram callback_query** | Read `update.callback_query.data` as your "emoji" equivalent (your bot would set this when rendering the inline keyboard). |
-| **Linear comment :emoji:** | Listen for `Reaction.emoji` on `Comment` resources. |
-| **GitHub issue reactions** | Listen for the `reaction` event, map `+1` → `approved` etc. |
-| **In-app button click** | Use the [http-button capture adapter](../../packages/reference/src/capture-adapters/http-button.ts) instead — it takes a typed JSON body, no signature verification (auth is your route's responsibility). |
+| Source                      | What changes                                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Telegram callback_query** | Read `update.callback_query.data` as your "emoji" equivalent (your bot would set this when rendering the inline keyboard).                                                                                 |
+| **Linear comment :emoji:**  | Listen for `Reaction.emoji` on `Comment` resources.                                                                                                                                                        |
+| **GitHub issue reactions**  | Listen for the `reaction` event, map `+1` → `approved` etc.                                                                                                                                                |
+| **In-app button click**     | Use the [http-button capture adapter](../../packages/reference/src/capture-adapters/http-button.ts) instead — it takes a typed JSON body, no signature verification (auth is your route's responsibility). |
 
 ## Production checklist
 

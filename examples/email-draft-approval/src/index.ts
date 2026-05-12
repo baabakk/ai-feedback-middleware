@@ -132,9 +132,7 @@ async function main(): Promise<void> {
     const axes = (["detection", "content", "timing", "channel"] as const)
       .map((a) => `${a[0]}=${e[a] ?? "—"}`)
       .join(" ");
-    console.log(
-      `  ${r.artifact_id.padEnd(28)} action=${r.action.padEnd(28)} ${axes}`,
-    );
+    console.log(`  ${r.artifact_id.padEnd(28)} action=${r.action.padEnd(28)} ${axes}`);
   }
 
   console.log("\n--- Final lifecycle status by artifact ---\n");
@@ -152,12 +150,8 @@ async function main(): Promise<void> {
   );
   console.log("  • Approved sets all four axes positive; manually_edited keeps detection /");
   console.log("    timing / channel positive but flips content to negative (the user kept the");
-  console.log(
-    "    trigger but changed the content). Rejected leaves detection empty by design —",
-  );
-  console.log(
-    "    a single rejection cannot disambiguate trigger-error from version-error.",
-  );
+  console.log("    trigger but changed the content). Rejected leaves detection empty by design —");
+  console.log("    a single rejection cannot disambiguate trigger-error from version-error.");
 }
 
 main().catch((err) => {

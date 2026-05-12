@@ -122,9 +122,7 @@ async function main(): Promise<void> {
     { artifact_id: "draft-001", action: "rejected" },
     { artifact_id: "draft-002", action: "approved" },
   ]);
-  await seedTenant(feedback, "initech", [
-    { artifact_id: "draft-001", action: "manually_edited" },
-  ]);
+  await seedTenant(feedback, "initech", [{ artifact_id: "draft-001", action: "manually_edited" }]);
 
   console.log("--- Reading per-tenant ---\n");
   for (const tenant_id of ["acme", "globex", "initech"]) {
@@ -161,9 +159,7 @@ async function main(): Promise<void> {
     "  • Adapter indexes on partition_key make tenant-scoped reads cheap (see the Postgres",
   );
   console.log("    schema's idx_captured_artifacts_partition + idx_reactions_partition).");
-  console.log(
-    "  • If you need actionability rules per-tenant, scope the rule's applies_when by",
-  );
+  console.log("  • If you need actionability rules per-tenant, scope the rule's applies_when by");
   console.log(
     "    task_type or by storing the tenant_id in task_type itself (e.g. `tenant:acme:draft`).",
   );

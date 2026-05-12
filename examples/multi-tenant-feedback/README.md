@@ -31,10 +31,10 @@ pnpm --filter multi-tenant-feedback start
 
 ## Two prefix conventions
 
-| Convention | Looks like | Use when |
-|---|---|---|
-| `${tenant_id}/${artifact_id}` (this example) | `acme/draft-001` | You want one partition per artifact + tenant-prefix isolation. Cleanest for most consumers. |
-| `${tenant_id}` (one partition per tenant) | partition_key = `acme` for ALL of tenant acme's events | You want ordered global stream per tenant (e.g. for SSE feeds). Costs you per-artifact partition granularity. |
+| Convention                                   | Looks like                                             | Use when                                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `${tenant_id}/${artifact_id}` (this example) | `acme/draft-001`                                       | You want one partition per artifact + tenant-prefix isolation. Cleanest for most consumers.                   |
+| `${tenant_id}` (one partition per tenant)    | partition_key = `acme` for ALL of tenant acme's events | You want ordered global stream per tenant (e.g. for SSE feeds). Costs you per-artifact partition granularity. |
 
 Pick once; document it; enforce it in the tenant-client wrapper.
 

@@ -108,9 +108,7 @@ async function main(): Promise<void> {
   }
   for (const r of reactions) {
     const e = r.evaluations;
-    const axes = (["detection", "content"] as const)
-      .map((a) => `${a[0]}=${e[a] ?? "—"}`)
-      .join(" ");
+    const axes = (["detection", "content"] as const).map((a) => `${a[0]}=${e[a] ?? "—"}`).join(" ");
     const competitors = (r.payload as { competitors?: string[] })?.competitors ?? [];
     console.log(
       `  ${r.artifact_id.padEnd(22)} action=${r.action.padEnd(24)} ${axes}` +

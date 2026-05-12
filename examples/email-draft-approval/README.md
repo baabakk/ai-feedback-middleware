@@ -45,9 +45,9 @@ silently_rejected_expired: 1
 
 Most adaptations are one-line changes:
 
-| What you'd change | How |
-|---|---|
-| The artifact type | Replace `"draft_email"` with `"contract_proposal"`, `"deploy_plan"`, etc. |
-| The deadline | Replace `shortDeadline()` with your domain's window (e.g. `24h`, `5min`) |
+| What you'd change         | How                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| The artifact type         | Replace `"draft_email"` with `"contract_proposal"`, `"deploy_plan"`, etc.                                                       |
+| The deadline              | Replace `shortDeadline()` with your domain's window (e.g. `24h`, `5min`)                                                        |
 | Where reactions come from | Swap the inline `recordReaction` calls for HTTP routes / Slack callbacks (see [`../slack-approval-bot`](../slack-approval-bot)) |
-| Persistence | Swap in-memory adapters for Postgres (see [`../postgres-only`](../postgres-only)) |
+| Persistence               | Swap in-memory adapters for Postgres (see [`../postgres-only`](../postgres-only))                                               |

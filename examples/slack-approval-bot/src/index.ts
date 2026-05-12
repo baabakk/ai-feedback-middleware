@@ -183,9 +183,7 @@ async function main(): Promise<void> {
     "  • The webhook capture adapter handles HMAC-SHA256 verification + JSON parsing + the",
   );
   console.log("    recordReaction call in one function. Your HTTP route is two lines.");
-  console.log(
-    "  • The bridge layer is the consumer's responsibility: mapping Slack emoji →",
-  );
+  console.log("  • The bridge layer is the consumer's responsibility: mapping Slack emoji →");
   console.log(
     "    framework action vocabulary. Keep this mapping in one place (slackEmojiToAction)",
   );
@@ -193,9 +191,7 @@ async function main(): Promise<void> {
   console.log(
     "  • Provenance.channel + provenance.captured_by_adapter let you trace every reaction",
   );
-  console.log(
-    "    back to the source system. The Slack message timestamp lives in the payload so",
-  );
+  console.log("    back to the source system. The Slack message timestamp lives in the payload so");
   console.log("    you can deep-link back to the original message.");
   console.log(
     "  • The same pattern works for any external event source: Telegram callback queries,",

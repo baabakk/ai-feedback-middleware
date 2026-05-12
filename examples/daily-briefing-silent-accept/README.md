@@ -10,7 +10,7 @@ You generate a daily briefing at 7am. You want to learn from feedback ("this bri
 
 Register `morning_briefing` with `expirationPolicy: "accepted_by_default"`. The Lifecycle Worker fires `silently_accepted` on deadline — explicit-positive on `detection` + `content`, deliberately empty on `timing` + `channel` (silence can't disambiguate a perfect brief from one that was never seen).
 
-If the user *does* push back, the two interesting actions are:
+If the user _does_ push back, the two interesting actions are:
 
 - **`manually_edited`** — kept your brief and adjusted it. Diff in payload.
 - **`manually_replaced`** — threw your brief out and wrote their own from scratch. Stronger content-axis negative than edit; diff size in payload distinguishes them.

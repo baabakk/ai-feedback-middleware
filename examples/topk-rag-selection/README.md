@@ -15,9 +15,9 @@ Naive instrumentation captures `approved` on the picked option and silently drop
 
 Each loser carries `{ competitors: [...], chosen }` in its payload, so any downstream consumer can reconstruct the comparison set without joining. Per-axis evaluation:
 
-| Reaction | detection | content |
-|---|---|---|
-| `approved` (chosen) | positive | positive |
+| Reaction                          | detection                                       | content  |
+| --------------------------------- | ----------------------------------------------- | -------- |
+| `approved` (chosen)               | positive                                        | positive |
 | `not_selected_from_list` (losers) | **positive** (user picked something in the set) | negative |
 
 ## Run
@@ -35,12 +35,12 @@ pnpm --filter topk-rag-selection start
 
 ## Adapt it
 
-| Use case | What changes |
-|---|---|
-| **Image-gen variants** | `artifact_type: "image_variant"`, `selection_method: "user_pick"`. Train a preference model from the resulting reactions. |
+| Use case                      | What changes                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Image-gen variants**        | `artifact_type: "image_variant"`, `selection_method: "user_pick"`. Train a preference model from the resulting reactions.      |
 | **Multi-armed bandit reward** | Pipe the chosen + losers into your bandit's reward path. The framework's per-axis evaluations are the structured reward shape. |
-| **Recommender training data** | Each comparative event is one training row: `(query, candidates, chosen) → relevance labels`. |
-| **Prompt A/B/N testing** | `artifact_type: "prompt_variant"`. Aggregate `approved`/`not_selected_from_list` counts per prompt to find winners. |
+| **Recommender training data** | Each comparative event is one training row: `(query, candidates, chosen) → relevance labels`.                                  |
+| **Prompt A/B/N testing**      | `artifact_type: "prompt_variant"`. Aggregate `approved`/`not_selected_from_list` counts per prompt to find winners.            |
 
 ## Variants on `selection_method`
 

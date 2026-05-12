@@ -115,9 +115,7 @@ async function main(): Promise<void> {
   }
 
   if (decisions.length === 0) {
-    console.log(
-      "  (no decisions — try increasing artifact count above the threshold of 3)",
-    );
+    console.log("  (no decisions — try increasing artifact count above the threshold of 3)");
   }
   for (const d of decisions) {
     console.log(`  decision_id     : ${d.decision_id}`);
@@ -134,21 +132,15 @@ async function main(): Promise<void> {
   console.log(
     "  • Layer 4 ran inline inside recordReaction — decision lands in the SAME transaction",
   );
-  console.log(
-    "    as the reaction event. No async eventual consistency to worry about.",
-  );
+  console.log("    as the reaction event. No async eventual consistency to worry about.");
   console.log(
     "  • Decisions land in a separate immutable table; the inference output is an event of",
   );
-  console.log(
-    "    its own kind, not a mutation on the original reactions.",
-  );
+  console.log("    its own kind, not a mutation on the original reactions.");
   console.log(
     "  • Downstream consumers subscribe to feedback.inference.content.actionable_negative to",
   );
-  console.log(
-    "    feed prompt-tuning queues, LangSmith/Humanloop datasets, Slack alerts, etc.",
-  );
+  console.log("    feed prompt-tuning queues, LangSmith/Humanloop datasets, Slack alerts, etc.");
   console.log(
     "  • Tombstones (cancelled / corrected / superseded_by) filter symmetrically: a cancelled",
   );
