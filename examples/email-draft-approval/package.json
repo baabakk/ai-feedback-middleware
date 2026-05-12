@@ -1,0 +1,20 @@
+{
+  "name": "email-draft-approval",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reject-by-default approval flow. Captures an email draft, simulates user reactions (approve / edit / reject / silence-until-deadline), shows the Lifecycle Worker firing silently_rejected_expired when nobody acts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

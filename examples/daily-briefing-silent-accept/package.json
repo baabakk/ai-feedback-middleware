@@ -1,0 +1,20 @@
+{
+  "name": "daily-briefing-silent-accept",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Accept-by-default flow. Captures daily briefings; silence reads as endorsement and the Lifecycle Worker fires silently_accepted on deadline. Contrast partner to email-draft-approval.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

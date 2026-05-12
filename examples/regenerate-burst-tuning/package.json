@@ -1,0 +1,20 @@
+{
+  "name": "regenerate-burst-tuning",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Layer 4 (Actionable Result Inference) end-to-end. A threshold rule crystallizes 'regenerated' bursts into actionable_negative content-axis decisions; downstream consumers feed those into a prompt-tuning queue.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "multi-tenant-feedback",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Multi-tenant feedback isolation. partition_key carries tenant_id; reads, projections, and actionability rules are tenant-scoped without changing the framework's storage schema.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "topk-rag-selection",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Top-K comparative selection. A retriever surfaces 5 candidates; the user picks one. recordCompetitiveSelection fans out to N reactions: chosen gets 'approved', others get 'not_selected_from_list' with competitor context in payload.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
