@@ -101,10 +101,7 @@ function main(): void {
   errors.push(
     ...checkSchema(
       "./captured-evaluated-reaction.schema.json",
-      CapturedEvaluatedReactionEventSchema.shape as Record<
-        string,
-        { isOptional: () => boolean }
-      >,
+      CapturedEvaluatedReactionEventSchema.shape as Record<string, { isOptional: () => boolean }>,
       "CapturedEvaluatedReactionEvent",
     ),
   );
@@ -115,8 +112,8 @@ function main(): void {
   const provShape = ProvenanceSchema.shape;
   const provZodKeys = Object.keys(provShape).sort();
   const provJsonProps = Object.keys(
-    ((captureJson.properties?.provenance as { properties?: Record<string, unknown> })
-      ?.properties ?? {}) as Record<string, unknown>,
+    ((captureJson.properties?.provenance as { properties?: Record<string, unknown> })?.properties ??
+      {}) as Record<string, unknown>,
   ).sort();
   errors.push(...diffArrays("Provenance properties (capture)", provZodKeys, provJsonProps));
 

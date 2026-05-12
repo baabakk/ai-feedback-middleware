@@ -40,7 +40,11 @@ export {
 
 // ---------- Registries ----------------------------------------------------
 
-export { ActionRegistry, registerAction, type FeedbackActionDefinition } from "./registry/actions.js";
+export {
+  ActionRegistry,
+  registerAction,
+  type FeedbackActionDefinition,
+} from "./registry/actions.js";
 export {
   ArtifactTypeRegistry,
   acceptByDefault,

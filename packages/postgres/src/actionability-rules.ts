@@ -1,8 +1,5 @@
 import type { Pool } from "pg";
-import type {
-  ActionabilityRule,
-  ActionabilityRulesPort,
-} from "@ai-feedback-middleware/core";
+import type { ActionabilityRule, ActionabilityRulesPort } from "@ai-feedback-middleware/core";
 
 export interface PostgresActionabilityRulesOptions {
   pool: Pool;

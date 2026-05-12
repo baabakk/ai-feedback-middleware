@@ -1,8 +1,4 @@
-import type {
-  CapturedEvaluatedReactionEvent,
-  EventFilter,
-  FeedbackEvent,
-} from "../event-types.js";
+import type { CapturedEvaluatedReactionEvent, EventFilter, FeedbackEvent } from "../event-types.js";
 
 /**
  * Opaque transaction handle. Adapters define their own concrete type.

@@ -18,7 +18,9 @@ describe("in-memory bus SubscribeOptions validation", () => {
 
   it("accepts at-most-once explicitly", async () => {
     const bus = createInMemoryEventBus();
-    const unsub = await bus.subscribe("feedback.>", async () => {}, { deliveryMode: "at-most-once" });
+    const unsub = await bus.subscribe("feedback.>", async () => {}, {
+      deliveryMode: "at-most-once",
+    });
     await unsub();
   });
 

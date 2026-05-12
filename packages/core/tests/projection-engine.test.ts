@@ -68,7 +68,12 @@ function makeReaction(
     task_type: "test_task",
     source: "explicit",
     action: "approved",
-    evaluations: { detection: "positive", content: "positive", timing: "positive", channel: "positive" },
+    evaluations: {
+      detection: "positive",
+      content: "positive",
+      timing: "positive",
+      channel: "positive",
+    },
     classifier_version: "test-2.1",
     occurred_at: "2026-04-24T00:00:00Z",
     captured_at: "2026-04-24T00:00:00Z",
@@ -182,9 +187,6 @@ describe("ProjectionEngine", () => {
   });
 
   it("lists all builder names", () => {
-    expect(engine.builderNames().sort()).toEqual([
-      "approval_counter",
-      "content_negative_counter",
-    ]);
+    expect(engine.builderNames().sort()).toEqual(["approval_counter", "content_negative_counter"]);
   });
 });

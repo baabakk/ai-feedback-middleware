@@ -1,7 +1,4 @@
-import type {
-  ActionabilityRule,
-  ActionabilityRulesPort,
-} from "@ai-feedback-middleware/core";
+import type { ActionabilityRule, ActionabilityRulesPort } from "@ai-feedback-middleware/core";
 
 export interface InMemoryActionabilityRulesOptions {
   /** Optional initial rules. */

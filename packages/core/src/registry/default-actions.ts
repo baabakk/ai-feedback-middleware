@@ -123,8 +123,7 @@ export const DEFAULT_ACTIONS: FeedbackActionDefinition[] = [
       channel: "positive",
     },
     payloadSchema: ManuallyEditedPayloadSchema,
-    description:
-      "User opened, modified, used the edited version. Diff in payload.",
+    description: "User opened, modified, used the edited version. Diff in payload.",
   },
   {
     name: "rejected",

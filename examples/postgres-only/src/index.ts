@@ -61,10 +61,7 @@ async function main(): Promise<void> {
       projectionStore: createPostgresProjectionStore({ pool }),
       trackedArtifacts: createPostgresTrackedArtifactsStore({ pool }),
       actions: DEFAULT_ACTIONS,
-      artifactTypes: [
-        rejectByDefault("draft_email"),
-        acceptByDefault("morning_briefing"),
-      ],
+      artifactTypes: [rejectByDefault("draft_email"), acceptByDefault("morning_briefing")],
       projections: [approvalCountByProducer],
     });
 

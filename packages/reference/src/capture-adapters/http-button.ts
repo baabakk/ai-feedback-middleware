@@ -24,10 +24,7 @@ export interface HttpButtonClickPayload {
  * event_id. The route returns it to the client.
  */
 export function createHttpButtonCaptureAdapter(feedback: CapturePort): {
-  handle: (
-    payload: HttpButtonClickPayload,
-    channel?: string,
-  ) => Promise<{ event_id: string }>;
+  handle: (payload: HttpButtonClickPayload, channel?: string) => Promise<{ event_id: string }>;
 } {
   return {
     async handle(payload, channel = "http") {

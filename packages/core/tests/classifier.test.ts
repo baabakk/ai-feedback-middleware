@@ -79,9 +79,10 @@ describe("evaluateReaction (Layer 3 — Reaction Evaluation)", () => {
   });
 
   it("manually_replaced: detection right, content wrong", () => {
-    expect(
-      evaluateReaction(byName["manually_replaced"]!, { replacement: "x" }, ctx),
-    ).toEqual({ detection: "positive", content: "negative" });
+    expect(evaluateReaction(byName["manually_replaced"]!, { replacement: "x" }, ctx)).toEqual({
+      detection: "positive",
+      content: "negative",
+    });
   });
 
   it("tombstones (corrected/cancelled/superseded_by) carry empty evaluations", () => {

@@ -56,9 +56,7 @@ export class ArtifactTypeRegistry {
     ) {
       throw new Error(
         `Artifact type "${type.name}" must declare expirationPolicy as ` +
-          `"accepted_by_default" or "rejected_by_default". Got: ${String(
-            type.expirationPolicy,
-          )}`,
+          `"accepted_by_default" or "rejected_by_default". Got: ${String(type.expirationPolicy)}`,
       );
     }
     this.types.set(type.name, type);

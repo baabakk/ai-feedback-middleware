@@ -90,8 +90,8 @@ For production wiring (Postgres + Redis + outbox + middleware) see
 
 ## Packages
 
-| Package                                        | Status | Purpose                                                                                                                         |
-| ---------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Package                                       | Status | Purpose                                                                                                                         |
+| --------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | `@ai-feedback-middleware/core`                | F0     | Types, classifier, registry, ports, middleware, upcasters, edit-diff labeler                                                    |
 | `@ai-feedback-middleware/in-memory`           | F0     | In-memory adapters for tests and small deployments                                                                              |
 | `@ai-feedback-middleware/postgres`            | F1     | Postgres event store + projection store + outbox + dedupe + inference rules + migrations                                        |

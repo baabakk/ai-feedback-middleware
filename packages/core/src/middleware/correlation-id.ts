@@ -22,9 +22,7 @@ export function correlationIdMiddleware(
       correlation_id: generate(),
     } as FeedbackEvent["provenance"];
     const enriched: FeedbackEvent =
-      event.event_kind === "capture"
-        ? { ...event, provenance }
-        : { ...event, provenance };
+      event.event_kind === "capture" ? { ...event, provenance } : { ...event, provenance };
     return next(enriched);
   };
 }

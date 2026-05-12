@@ -84,10 +84,9 @@ export function createPostgresTrackedArtifactsStore(
     },
 
     async getByArtifactId(artifact_id: string): Promise<TrackedArtifactRow | null> {
-      const result = await pool.query<DbRow>(
-        `SELECT * FROM ${table} WHERE artifact_id = $1`,
-        [artifact_id],
-      );
+      const result = await pool.query<DbRow>(`SELECT * FROM ${table} WHERE artifact_id = $1`, [
+        artifact_id,
+      ]);
       return result.rows[0] ? rowToRecord(result.rows[0]) : null;
     },
 

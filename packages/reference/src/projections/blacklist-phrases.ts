@@ -63,8 +63,7 @@ export function createRemovedPhrasesProjection(
   return {
     name: "removed_phrases",
     mode: "sync",
-    applies: (event) =>
-      event.event_kind === "reaction" && event.action === "manually_edited",
+    applies: (event) => event.event_kind === "reaction" && event.action === "manually_edited",
     // One global key — phrases are not partition-scoped (the same corporate
     // filler is junk regardless of which artifact triggered the edit).
     keyFor: () => "global",

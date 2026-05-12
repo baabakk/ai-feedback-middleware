@@ -60,9 +60,7 @@ export interface CapturePort {
    * idiom: one `approved` reaction on the chosen artifact and one
    * `not_selected_from_list` reaction on each non-chosen alternative.
    */
-  recordCompetitiveSelection(
-    input: CompetitiveSelectionInput,
-  ): Promise<{ event_ids: string[] }>;
+  recordCompetitiveSelection(input: CompetitiveSelectionInput): Promise<{ event_ids: string[] }>;
 
   // ----- Read methods -------------------------------------------------------
 

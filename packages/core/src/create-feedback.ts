@@ -388,9 +388,7 @@ export function createFeedback(options: CreateFeedbackOptions): CapturePort {
       return stream;
     },
 
-    readActionableDecisions(
-      filter?: ActionabilityFilter,
-    ): AsyncIterable<ActionabilityDecision> {
+    readActionableDecisions(filter?: ActionabilityFilter): AsyncIterable<ActionabilityDecision> {
       if (!options.actionabilityDecisions) {
         throw new Error(
           "readActionableDecisions: no ActionabilityDecisionsStore was wired. " +

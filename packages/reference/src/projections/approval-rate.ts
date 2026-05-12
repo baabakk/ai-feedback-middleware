@@ -41,8 +41,7 @@ const TERMINAL_ACTIONS = new Set([
 export const approvalRateProjection: ProjectionBuilder<ApprovalRateState> = {
   name: "approval_rate",
   mode: "sync",
-  applies: (event) =>
-    event.event_kind === "reaction" && TERMINAL_ACTIONS.has(event.action),
+  applies: (event) => event.event_kind === "reaction" && TERMINAL_ACTIONS.has(event.action),
   keyFor: (event) => `${event.producer}::${event.task_type}`,
   apply: (event, current) => {
     const prev = current ?? { total: 0, resolved: 0, approved: 0, negative: 0, approvalRate: 0 };

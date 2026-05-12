@@ -197,9 +197,7 @@ export const v1ToV2_1Upcaster: EventUpcaster = {
   upcast(event: unknown): FeedbackEvent {
     const v1 = event as V1FlatEvent;
     if (v1.event_version !== 1) {
-      throw new Error(
-        `v1ToV2_1Upcaster expected event_version=1; got ${v1.event_version}`,
-      );
+      throw new Error(`v1ToV2_1Upcaster expected event_version=1; got ${v1.event_version}`);
     }
 
     const renamedAction = V1_ACTION_RENAMES[v1.action] ?? v1.action;

@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type {
-  CapturedEvaluatedReactionEvent,
-  EventStorePort,
-} from "@ai-feedback-middleware/core";
+import type { CapturedEvaluatedReactionEvent, EventStorePort } from "@ai-feedback-middleware/core";
 import { collect, makeReaction } from "./test-fixtures.js";
 import { waitUntil } from "./poll.js";
 
@@ -55,9 +52,15 @@ export function runEventStoreConformance(options: EventStoreConformanceOptions):
     });
 
     it("isolates events by partition_key", async () => {
-      await adapter.append(makeReaction({ event_id: "a", partition_key: "p-A", artifact_id: "p-A" }));
-      await adapter.append(makeReaction({ event_id: "b", partition_key: "p-B", artifact_id: "p-B" }));
-      await adapter.append(makeReaction({ event_id: "c", partition_key: "p-A", artifact_id: "p-A" }));
+      await adapter.append(
+        makeReaction({ event_id: "a", partition_key: "p-A", artifact_id: "p-A" }),
+      );
+      await adapter.append(
+        makeReaction({ event_id: "b", partition_key: "p-B", artifact_id: "p-B" }),
+      );
+      await adapter.append(
+        makeReaction({ event_id: "c", partition_key: "p-A", artifact_id: "p-A" }),
+      );
 
       const a = await collect(adapter.readStream("p-A"));
       const b = await collect(adapter.readStream("p-B"));
@@ -244,12 +247,8 @@ export function runEventStoreConformance(options: EventStoreConformanceOptions):
     });
 
     it("readRecentReactions filters by partition + window", async () => {
-      await adapter.append(
-        makeReaction({ event_id: "old", occurred_at: "2026-01-01T00:00:00Z" }),
-      );
-      await adapter.append(
-        makeReaction({ event_id: "new", occurred_at: "2026-04-20T00:00:00Z" }),
-      );
+      await adapter.append(makeReaction({ event_id: "old", occurred_at: "2026-01-01T00:00:00Z" }));
+      await adapter.append(makeReaction({ event_id: "new", occurred_at: "2026-04-20T00:00:00Z" }));
       const recent = await adapter.readRecentReactions({
         partition_key: "p-1",
         since_timestamp: "2026-03-01T00:00:00Z",

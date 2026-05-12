@@ -10,11 +10,7 @@
  *
  * Run: pnpm --filter threshold-crystallization start
  */
-import {
-  createFeedback,
-  DEFAULT_ACTIONS,
-  rejectByDefault,
-} from "@ai-feedback-middleware/core";
+import { createFeedback, DEFAULT_ACTIONS, rejectByDefault } from "@ai-feedback-middleware/core";
 import {
   createInMemoryEventStore,
   createInMemoryProjectionStore,

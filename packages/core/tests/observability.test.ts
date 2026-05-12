@@ -46,9 +46,7 @@ function makeStore(): EventStorePort {
       return async () => {};
     },
     async readRecentReactions() {
-      return events.filter(
-        (e): e is CapturedEvaluatedReactionEvent => e.event_kind === "reaction",
-      );
+      return events.filter((e): e is CapturedEvaluatedReactionEvent => e.event_kind === "reaction");
     },
     async readTombstonedArtifactIds() {
       return new Set<string>();

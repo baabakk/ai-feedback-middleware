@@ -72,8 +72,14 @@ describe("approvalRateProjection", () => {
 
   it("isolates state per (producer, task_type)", async () => {
     const feedback = makeFeedback([approvalRateProjection]);
-    await captureAndReact(feedback, "a-1", "approved", { producer: "agent-A", task_type: "task-X" });
-    await captureAndReact(feedback, "a-2", "rejected", { producer: "agent-B", task_type: "task-Y" });
+    await captureAndReact(feedback, "a-1", "approved", {
+      producer: "agent-A",
+      task_type: "task-X",
+    });
+    await captureAndReact(feedback, "a-2", "rejected", {
+      producer: "agent-B",
+      task_type: "task-Y",
+    });
 
     const states = await feedback.queryProjection<ApprovalRateState>("approval_rate", undefined);
     expect(states.length).toBe(2);
@@ -131,8 +137,7 @@ describe("createRemovedPhrasesProjection", () => {
     });
     await captureAndReact(feedback, "a-2", "manually_edited", {
       payload: {
-        original:
-          "I wanted to reach out about leveraging synergies between our teams.",
+        original: "I wanted to reach out about leveraging synergies between our teams.",
         corrected: "Following up on our conversation.",
       },
     });

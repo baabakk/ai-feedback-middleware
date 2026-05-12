@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type {
-  ActionabilityRule,
-  ActionabilityRulesPort,
-} from "@ai-feedback-middleware/core";
+import type { ActionabilityRule, ActionabilityRulesPort } from "@ai-feedback-middleware/core";
 
 export interface ActionabilityRulesConformanceOptions {
   name: string;

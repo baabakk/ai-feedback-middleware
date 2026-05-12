@@ -28,7 +28,12 @@ function makeEvent(overrides: Partial<ReactionEvent> = {}): FeedbackEvent {
     task_type: "test_task",
     source: "explicit",
     action: "approved",
-    evaluations: { detection: "positive", content: "positive", timing: "positive", channel: "positive" },
+    evaluations: {
+      detection: "positive",
+      content: "positive",
+      timing: "positive",
+      channel: "positive",
+    },
     classifier_version: "test-2.1",
     occurred_at: "2026-04-24T00:00:00Z",
     captured_at: "2026-04-24T00:00:00Z",

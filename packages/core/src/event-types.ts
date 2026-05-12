@@ -75,10 +75,7 @@ export type EvaluationVector = z.infer<typeof EvaluationVectorSchema>;
  * `rejected_by_default` policy values. `continue_to_observe` makes the
  * recurring-state semantics explicit: it is an instruction to keep watching.
  */
-export type AxisInference =
-  | "actionable_positive"
-  | "actionable_negative"
-  | "continue_to_observe";
+export type AxisInference = "actionable_positive" | "actionable_negative" | "continue_to_observe";
 
 export const AxisInferenceSchema = z.enum([
   "actionable_positive",
@@ -192,9 +189,7 @@ export const CapturedEvaluatedReactionEventSchema = z.object({
   successor_artifact_id: z.string().optional(),
 });
 
-export type CapturedEvaluatedReactionEvent = z.infer<
-  typeof CapturedEvaluatedReactionEventSchema
->;
+export type CapturedEvaluatedReactionEvent = z.infer<typeof CapturedEvaluatedReactionEventSchema>;
 
 // ---------- Discriminated union -------------------------------------------
 

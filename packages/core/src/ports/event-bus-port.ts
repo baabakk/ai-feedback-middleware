@@ -148,7 +148,11 @@ export function topicsFor(event: FeedbackEvent): string[] {
     `feedback.producer.${event.producer}`,
   ];
 
-  if (event.action === "corrected" || event.action === "cancelled" || event.action === "superseded_by") {
+  if (
+    event.action === "corrected" ||
+    event.action === "cancelled" ||
+    event.action === "superseded_by"
+  ) {
     topics.push(`feedback.tombstone.${event.action}`);
   }
   return topics;
@@ -166,7 +170,9 @@ export function topicsForActionabilityDecision(decision: {
 }): string[] {
   const topics = [`feedback.inference.${decision.axis}.${decision.inference}`];
   if (decision.artifact_type) {
-    topics.push(`feedback.inference.${decision.axis}.${decision.inference}.${decision.artifact_type}`);
+    topics.push(
+      `feedback.inference.${decision.axis}.${decision.inference}.${decision.artifact_type}`,
+    );
   }
   return topics;
 }

@@ -113,14 +113,11 @@ async function main(): Promise<void> {
 
     // Async subscriber: counts events by source (mock quality metrics).
     const sourceCounts = new Map<string, number>();
-    unsubMetrics = await eventBus.subscribe(
-      "feedback.reaction.>",
-      async (event: FeedbackEvent) => {
-        if (event.event_kind !== "reaction") return;
-        const key = event.source;
-        sourceCounts.set(key, (sourceCounts.get(key) ?? 0) + 1);
-      },
-    );
+    unsubMetrics = await eventBus.subscribe("feedback.reaction.>", async (event: FeedbackEvent) => {
+      if (event.event_kind !== "reaction") return;
+      const key = event.source;
+      sourceCounts.set(key, (sourceCounts.get(key) ?? 0) + 1);
+    });
 
     stopScanner = startOutboxScanner({
       outbox,

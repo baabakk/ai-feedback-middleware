@@ -98,9 +98,9 @@ describe("InMemoryEventStore", () => {
         evaluations: { detection: "positive", content: "positive" },
       }),
     );
-    expect(
-      (await collect(store.readAll({ source: "explicit" }))).map((e) => e.event_id),
-    ).toEqual(["expl"]);
+    expect((await collect(store.readAll({ source: "explicit" }))).map((e) => e.event_id)).toEqual([
+      "expl",
+    ]);
   });
 
   it("subscribeAll receives appended events", async () => {

@@ -69,7 +69,10 @@ async function main(): Promise<void> {
     const eventStore = createPostgresEventStore({ pool });
 
     async function reactWithAudit(
-      ev: Pick<CapturedEvaluatedReactionEvent, "event_id" | "artifact_id" | "artifact_version" | "action">,
+      ev: Pick<
+        CapturedEvaluatedReactionEvent,
+        "event_id" | "artifact_id" | "artifact_version" | "action"
+      >,
       auditShouldFail: boolean,
     ): Promise<void> {
       try {

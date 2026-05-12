@@ -38,9 +38,7 @@ export function makeReaction(
 }
 
 /** Build a v2.1 capture event for conformance suites. */
-export function makeCapture(
-  overrides: Partial<CapturedArtifactEvent> = {},
-): CapturedArtifactEvent {
+export function makeCapture(overrides: Partial<CapturedArtifactEvent> = {}): CapturedArtifactEvent {
   const id = overrides.event_id ?? `e-${Math.random().toString(36).slice(2, 10)}`;
   const artifactId = overrides.artifact_id ?? "p-1";
   return {

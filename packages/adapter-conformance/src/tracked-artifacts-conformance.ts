@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type {
-  TrackedArtifactRow,
-  TrackedArtifactsPort,
-} from "@ai-feedback-middleware/core";
+import type { TrackedArtifactRow, TrackedArtifactsPort } from "@ai-feedback-middleware/core";
 
 export interface TrackedArtifactsConformanceOptions {
   name: string;
@@ -26,9 +23,7 @@ function row(overrides: Partial<TrackedArtifactRow> = {}): TrackedArtifactRow {
   };
 }
 
-export function runTrackedArtifactsConformance(
-  options: TrackedArtifactsConformanceOptions,
-): void {
+export function runTrackedArtifactsConformance(options: TrackedArtifactsConformanceOptions): void {
   const suite = options.skip ? describe.skip : describe;
 
   suite(`TrackedArtifactsPort conformance: ${options.name}`, () => {

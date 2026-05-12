@@ -134,10 +134,7 @@ function matchesPredicate(
     return false;
   }
   if (predicate.producer !== undefined && predicate.producer !== reaction.producer) return false;
-  if (
-    predicate.artifact_type !== undefined &&
-    predicate.artifact_type !== reaction.artifact_type
-  ) {
+  if (predicate.artifact_type !== undefined && predicate.artifact_type !== reaction.artifact_type) {
     return false;
   }
   return true;

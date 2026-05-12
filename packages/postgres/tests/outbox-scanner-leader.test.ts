@@ -22,7 +22,7 @@ function makeCountingBus(label: string, sink: Map<string, string[]>): EventBusPo
     async publishBatch(_topic: string, events: FeedbackEvent[]): Promise<void> {
       for (const e of events) list.push(e.event_id);
     },
-    subscribe() {
+    async subscribe() {
       return async () => {};
     },
   };

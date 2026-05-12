@@ -29,7 +29,9 @@ function reaction(
     action: string;
     occurred_at: string;
     evaluations?: EvaluationVector;
-  } & Partial<Omit<CapturedEvaluatedReactionEvent, "artifact_id" | "action" | "occurred_at" | "evaluations">>,
+  } & Partial<
+    Omit<CapturedEvaluatedReactionEvent, "artifact_id" | "action" | "occurred_at" | "evaluations">
+  >,
 ): CapturedEvaluatedReactionEvent {
   const { artifact_id, action, occurred_at, evaluations, ...rest } = spec;
   return {
@@ -259,7 +261,12 @@ describe("evaluateRule — tombstone filtering (direction-symmetric)", () => {
 describe("evaluateRules — batch", () => {
   it("flattens decisions across multiple rules", () => {
     const r1 = rule({ rule_id: "r1", axis: "content", threshold: 1 });
-    const r2 = rule({ rule_id: "r2", axis: "timing", threshold: 1, result_if_met: "actionable_negative" });
+    const r2 = rule({
+      rule_id: "r2",
+      axis: "timing",
+      threshold: 1,
+      result_if_met: "actionable_negative",
+    });
     const reactions = [
       reaction({
         artifact_id: "a-1",

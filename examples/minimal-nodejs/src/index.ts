@@ -43,10 +43,7 @@ async function main(): Promise<void> {
     projectionStore: createInMemoryProjectionStore(),
     trackedArtifacts: createInMemoryTrackedArtifactsStore(),
     actions: DEFAULT_ACTIONS,
-    artifactTypes: [
-      rejectByDefault("draft_email"),
-      acceptByDefault("morning_briefing"),
-    ],
+    artifactTypes: [rejectByDefault("draft_email"), acceptByDefault("morning_briefing")],
     projections: [approvalCountByProducer],
   });
 

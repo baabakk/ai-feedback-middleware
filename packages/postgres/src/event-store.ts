@@ -201,10 +201,7 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
     return (tx ?? pool) as Pool | PoolClient;
   }
 
-  async function appendInternal(
-    client: Pool | PoolClient,
-    event: FeedbackEvent,
-  ): Promise<void> {
+  async function appendInternal(client: Pool | PoolClient, event: FeedbackEvent): Promise<void> {
     if (event.event_kind === "capture") {
       await appendCapture(client, event);
     } else {
@@ -319,12 +316,8 @@ export function createPostgresEventStore(options: PostgresEventStoreOptions): Ev
       }
     },
 
-    async *readStream(
-      partitionKey: string,
-      fromVersion?: number,
-    ): AsyncIterable<FeedbackEvent> {
-      const versionFilter =
-        fromVersion !== undefined ? `AND artifact_version >= $2` : "";
+    async *readStream(partitionKey: string, fromVersion?: number): AsyncIterable<FeedbackEvent> {
+      const versionFilter = fromVersion !== undefined ? `AND artifact_version >= $2` : "";
       const params: unknown[] = [partitionKey];
       if (fromVersion !== undefined) params.push(fromVersion);
 

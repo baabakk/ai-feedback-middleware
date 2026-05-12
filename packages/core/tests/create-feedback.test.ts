@@ -304,9 +304,9 @@ describe("recordReaction", () => {
       payload: {},
       expires_at: FUTURE,
     });
-    await expect(
-      feedback.recordReaction({ artifact_id, action: "starred" }),
-    ).rejects.toThrow(/Unknown action: starred/);
+    await expect(feedback.recordReaction({ artifact_id, action: "starred" })).rejects.toThrow(
+      /Unknown action: starred/,
+    );
   });
 
   it("throws when artifact_id was never captured", async () => {

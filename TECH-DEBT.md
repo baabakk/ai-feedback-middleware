@@ -290,14 +290,14 @@ Schema evolution contract is now backed by code: future minor-version bumps ship
 
 ## Summary
 
-| Severity            | Open                          | In Progress | Resolved                        | Total  |
-| ------------------- | ----------------------------- | ----------- | ------------------------------- | ------ |
-| High                | 1 (H5, deferred to Kafka/SQS) | 0           | 4 (H1, H2, H3, H4)              | 5      |
-| Medium (test rigor) | 0                             | 0           | 6 (M1, M2, M3, M4, M5, M6)      | 6      |
-| Medium (design)     | 0                             | 0           | 6 (D1, D2, D3, D4, D5, D6)      | 6      |
-| Low (polish)        | 0                             | 0           | 7 (L1, L2, L3, L4, L5, L6, L7)  | 7      |
-| New (F2.6)          | 0                             | 0           | 2 (N1, N2)                      | 2      |
-| **Total**           | **1 (deferred)**              | **0**       | **25**                          | **26** |
+| Severity            | Open                          | In Progress | Resolved                       | Total  |
+| ------------------- | ----------------------------- | ----------- | ------------------------------ | ------ |
+| High                | 1 (H5, deferred to Kafka/SQS) | 0           | 4 (H1, H2, H3, H4)             | 5      |
+| Medium (test rigor) | 0                             | 0           | 6 (M1, M2, M3, M4, M5, M6)     | 6      |
+| Medium (design)     | 0                             | 0           | 6 (D1, D2, D3, D4, D5, D6)     | 6      |
+| Low (polish)        | 0                             | 0           | 7 (L1, L2, L3, L4, L5, L6, L7) | 7      |
+| New (F2.6)          | 0                             | 0           | 2 (N1, N2)                     | 2      |
+| **Total**           | **1 (deferred)**              | **0**       | **25**                         | **26** |
 
 **Pre-publish gate for v1.0.0:** all 25 actionable items resolved as of F4 Round 2. The remaining open item (H5) is deferred until a Kafka or Streams adapter ships — it only affects at-least-once buses, and the current Redis pub/sub default is at-most-once and unaffected. The framework can publish at v1.0.0 once §10.5's CI/smoke/external-review checks pass.
 
