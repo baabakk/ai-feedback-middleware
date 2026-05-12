@@ -59,9 +59,11 @@ jobs:
           npm init -y >/dev/null
           # Set type=module so the ESM-only artifacts work.
           node -e "const p=require('./package.json');p.type='module';require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2))"
-          for tarball in /tmp/feedback-tarballs/*.tgz; do
-            npm install --no-save "$tarball"
-          done
+          # Install all tarballs in a single command so npm resolves the
+          # cross-package dependencies (e.g. postgres → core) from the
+          # tarball args instead of trying to fetch them from the public
+          # registry (which 404s pre-publish).
+          npm install --no-save --install-strategy=nested /tmp/feedback-tarballs/*.tgz
           npm install --no-save zod
           ls node_modules/@ai-feedback-middleware/
 
@@ -70,39 +72,57 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/scratch/smoke.mjs <<'EOF'
-          import { createFeedback, DEFAULT_ACTIONS, matchesTopic } from "@ai-feedback-middleware/core";
+          import {
+            createFeedback,
+            DEFAULT_ACTIONS,
+            rejectByDefault,
+            matchesTopic,
+          } from "@ai-feedback-middleware/core";
           import {
             createInMemoryEventStore,
             createInMemoryProjectionStore,
+            createInMemoryTrackedArtifactsStore,
           } from "@ai-feedback-middleware/in-memory";
 
           const feedback = createFeedback({
             eventStore: createInMemoryEventStore(),
             projectionStore: createInMemoryProjectionStore(),
+            trackedArtifacts: createInMemoryTrackedArtifactsStore(),
             actions: DEFAULT_ACTIONS,
-            artifactTypes: [{ name: "draft" }],
+            artifactTypes: [rejectByDefault("draft_email")],
           });
 
-          await feedback.capture({
-            action: "approve",
-            artifact_type: "draft",
+          const expiresAt = new Date(Date.now() + 60_000).toISOString();
+          const cap = await feedback.captureArtifact({
+            artifact_type: "draft_email",
             artifact_id: "draft-1",
             artifact_version: 1,
             producer: "smoke-test",
             task_type: "linkage_check",
             payload: {},
+            expires_at: expiresAt,
+          });
+          await feedback.recordReaction({
+            artifact_id: cap.artifact_id,
+            action: "approved",
           });
 
-          const events = [];
-          for await (const e of feedback.readStream("draft-1")) events.push(e);
-          if (events.length !== 1) {
-            console.error(`Expected 1 event, got ${events.length}`);
+          const captures = [];
+          for await (const c of feedback.readCapturedArtifacts()) captures.push(c);
+          if (captures.length !== 1) {
+            console.error(`Expected 1 captured artifact, got ${captures.length}`);
             process.exit(1);
           }
-          if (!matchesTopic("feedback.>", "feedback.captured.explicit")) {
+          const reactions = [];
+          for await (const r of feedback.readReactions()) reactions.push(r);
+          if (reactions.length !== 1 || reactions[0].action !== "approved") {
+            console.error(`Expected 1 approved reaction, got ${reactions.length}`);
+            process.exit(1);
+          }
+          if (!matchesTopic("feedback.>", "feedback.reaction.action.approved")) {
             console.error("matchesTopic linkage broken");
             process.exit(1);
           }
-          console.log("Linkage smoke OK: imported core + in-memory from packed tarballs and round-tripped one event.");
+          console.log("Linkage smoke OK: imported core + in-memory from packed tarballs and round-tripped a capture + reaction.");
           EOF
           cd /tmp/scratch && node smoke.mjs

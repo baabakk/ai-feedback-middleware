@@ -1,8 +1,13 @@
 name: Release
 
+# Manual trigger only until the npm scope @ai-feedback-middleware is
+# registered and an NPM_TOKEN secret is set on the repo. Once set up,
+# re-enable the push trigger to publish on every main commit that has a
+# changeset.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
 
 concurrency:
   group: release-${{ github.ref }}
