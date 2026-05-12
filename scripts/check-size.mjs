@@ -28,16 +28,20 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 // Budgets in BYTES of the built `dist/index.js` (ESM output) per package.
-// These reflect real F4-Round-2 sizes plus headroom; tighten once a release
-// has shipped and we know how much to leave on the table.
+// Bumped at F5 R4 (v0.3.0-alpha.0) to ~115% of the new schema-v2.1 sizes:
+// core grew from the multi-axis polarity model + Lifecycle Worker + Layer 4
+// inference engine + new ports (CapturePort, ActionabilityRulesPort,
+// ActionabilityDecisionsStore, TrackedArtifactsPort); in-memory + postgres +
+// adapter-conformance grew to ship the three new conformance suites and the
+// new adapter implementations. Re-tighten once 0.3.0 stable lands.
 const BUDGETS = {
-  core: 40_000,
-  "in-memory": 12_000,
-  postgres: 25_000,
+  core: 60_000,
+  "in-memory": 16_000,
+  postgres: 35_000,
   "redis-pubsub": 10_000,
   streams: 5_000,
   reference: 8_000,
-  "adapter-conformance": 35_000,
+  "adapter-conformance": 50_000,
 };
 
 const here = process.cwd();
