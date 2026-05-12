@@ -59,12 +59,13 @@ jobs:
           npm init -y >/dev/null
           # Set type=module so the ESM-only artifacts work.
           node -e "const p=require('./package.json');p.type='module';require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2))"
-          # Install all tarballs in a single command so npm resolves the
-          # cross-package dependencies (e.g. postgres → core) from the
-          # tarball args instead of trying to fetch them from the public
-          # registry (which 404s pre-publish).
-          npm install --no-save --install-strategy=nested /tmp/feedback-tarballs/*.tgz
-          npm install --no-save zod
+          # Install all tarballs + zod in a SINGLE npm install so npm
+          # resolves cross-package deps from the args list (not the
+          # not-yet-published public registry), and so a follow-up
+          # `--no-save` install doesn't wipe the first via npm's lockfile
+          # reset behavior.
+          npm install --no-save --install-strategy=nested \
+            /tmp/feedback-tarballs/*.tgz zod
           ls node_modules/@ai-feedback-middleware/
 
       - name: Run minimal smoke against installed artifacts
