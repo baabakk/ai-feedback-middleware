@@ -1,7 +1,8 @@
-import type { OutboxPort, OutboxRow, FeedbackEvent } from "@llm-feedback-middleware/core";
+import type { OutboxPort, OutboxRow, FeedbackEvent } from "@ai-feedback-middleware/core";
 
 interface Row {
   event_id: string;
+  artifact_id: string;
   topics: string[];
   event: FeedbackEvent;
   enqueued_at: string;
@@ -23,9 +24,10 @@ export function createInMemoryOutbox(): OutboxPort {
   const rows = new Map<string, Row>();
 
   return {
-    async enqueue(event, topics): Promise<void> {
+    async enqueue(event, topics, artifact_id): Promise<void> {
       rows.set(event.event_id, {
         event_id: event.event_id,
+        artifact_id,
         topics,
         event,
         enqueued_at: new Date().toISOString(),
@@ -44,6 +46,7 @@ export function createInMemoryOutbox(): OutboxPort {
         .slice(0, limit);
       return eligible.map((r) => ({
         event_id: r.event_id,
+        artifact_id: r.artifact_id,
         topics: r.topics,
         enqueued_at: r.enqueued_at,
         attempt_count: r.attempt_count,

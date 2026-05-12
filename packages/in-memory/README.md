@@ -1,6 +1,6 @@
-# @llm-feedback-middleware/in-memory
+# @ai-feedback-middleware/in-memory
 
-In-memory adapters for `llm-feedback-middleware`. Use for tests and small single-process deployments.
+In-memory adapters for `ai-feedback-middleware`. Use for tests and small single-process deployments.
 
 ## Adapters
 
@@ -21,7 +21,7 @@ Events are stored in arrays. Projection state lives in maps. Subscribers are Eve
 - No multi-process or multi-host coordination
 - Subscriber backpressure is not handled
 
-For durable storage, use `@llm-feedback-middleware/postgres`.
+For durable storage, use `@ai-feedback-middleware/postgres`.
 
 ## License
 

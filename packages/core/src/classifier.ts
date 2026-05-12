@@ -1,54 +1,59 @@
-import type { Polarity, Inference } from "./event-types.js";
+import type { EvaluationVector } from "./event-types.js";
 import type { FeedbackActionDefinition } from "./registry/actions.js";
-import type { InferenceRule } from "./ports/inference-rules-port.js";
-import { evaluateRules, type InferenceContext } from "./inference-engine.js";
 
 /**
- * Context passed to the classifier.
+ * Layer 3 — Reaction Evaluation.
  *
- * - `rules`: the active inference rules (loaded by createFeedback at capture time)
- * - `history`: recent events for the partition (for threshold evaluation)
- * - `now`: optional override for testing
+ * Pure deterministic classifier. For each reaction event, computes per-axis
+ * polarity using the action's default heuristics plus any consumer-supplied
+ * per-event override.
+ *
+ * Same inputs → same outputs, always. No LLM, no I/O, no randomness.
+ *
+ * See spec §10 and architecture §29 (Layer 3).
  */
+
 export interface ClassifierContext {
-  task_type: string;
-  producer: string;
-  artifact_type: string;
-  rules?: InferenceRule[];
-  history?: ReadonlyArray<{ action: string; timestamp: string }>;
-  now?: string;
+  /** Identifier for the rule pack used; embedded on the reaction row as `classifier_version`. */
+  classifier_version: string;
+  task_type?: string;
+  producer?: string;
+  artifact_type?: string;
 }
 
 /**
- * Pure deterministic classifier. Same inputs produce same outputs, always.
- * No LLM, no I/O, no randomness.
+ * Compute the per-axis evaluation vector for a single reaction event.
  *
- * Polarity is the action's default. Inference is the action's default unless
- * a registered rule matches the predicate AND the threshold is met within
- * the configured window, in which case the rule's `result_if_met` wins.
+ * Override semantics:
+ *   - An axis present in `override` (with explicit `positive` or `negative`)
+ *     replaces the action's default for that axis.
+ *   - An axis absent from `override` keeps the action's default.
+ *   - To explicitly *omit* an axis the action would otherwise set, pass
+ *     `null` for that axis in `override` (filtered out before merging).
  */
-export function classify(
+export function evaluateReaction(
   action: FeedbackActionDefinition,
   _payload: unknown,
-  context?: ClassifierContext,
-): {
-  polarity: Polarity;
-  inference: Inference;
-} {
-  const polarity = action.polarity;
-  let inference: Inference = action.defaultInference;
+  _context: ClassifierContext,
+  override?: Partial<EvaluationVector> | null,
+): EvaluationVector {
+  const base: EvaluationVector = { ...action.defaultEvaluations };
+  if (!override) return base;
 
-  if (context && context.rules && context.rules.length > 0) {
-    const inferenceContext: InferenceContext = {
-      action: action.name,
-      task_type: context.task_type,
-      producer: context.producer,
-      artifact_type: context.artifact_type,
-      recentActions: context.history ?? [],
-      ...(context.now !== undefined && { now: context.now }),
-    };
-    inference = evaluateRules(context.rules, inferenceContext, action.defaultInference);
-  }
-
-  return { polarity, inference };
+  // Apply override axis-by-axis. Explicit `undefined` means "axis not
+  // mentioned"; explicit `null` (cast through Partial) is treated as "remove
+  // this axis" — but TypeScript users pass a normal Partial<EvaluationVector>,
+  // so here we just merge defined values.
+  const merged: EvaluationVector = { ...base };
+  if (override.detection !== undefined) merged.detection = override.detection;
+  if (override.content !== undefined) merged.content = override.content;
+  if (override.timing !== undefined) merged.timing = override.timing;
+  if (override.channel !== undefined) merged.channel = override.channel;
+  return merged;
 }
+
+/**
+ * Default classifier version emitted on reactions when the consumer does
+ * not supply an explicit `classifier_version` in the createFeedback options.
+ */
+export const DEFAULT_CLASSIFIER_VERSION = "default-2.1";

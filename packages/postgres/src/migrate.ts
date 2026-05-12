@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
  * node-pg-migrate, Flyway) and run framework migrations alongside your own.
  *
  * The shipped SQL files live under
- * `@llm-feedback-middleware/postgres/migrations/`.
+ * `@ai-feedback-middleware/postgres/migrations/`.
  *
  * @returns `applied` is the list of filenames applied during this call.
  *          `skipped` is the list previously-applied files that were

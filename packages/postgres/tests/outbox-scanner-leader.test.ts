@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { makeEvent, waitUntil } from "@llm-feedback-middleware/adapter-conformance";
-import type { EventBusPort, FeedbackEvent } from "@llm-feedback-middleware/core";
+import { makeEvent, waitUntil } from "@ai-feedback-middleware/adapter-conformance";
+import type { EventBusPort, FeedbackEvent } from "@ai-feedback-middleware/core";
 import { createPostgresOutbox, runMigrations, startOutboxScanner } from "../src/index.js";
 
 const { Pool } = pg;
@@ -58,8 +58,8 @@ if (skip) {
       // Enqueue 5 distinct events.
       const eventIds = ["lead-1", "lead-2", "lead-3", "lead-4", "lead-5"];
       for (const id of eventIds) {
-        const event = makeEvent({ event_id: id });
-        await outboxA.enqueue(event, ["feedback.captured"]);
+        const event = makeEvent({ event_id: id, artifact_id: id });
+        await outboxA.enqueue(event, ["feedback.captured"], id);
       }
 
       // Track per-scanner publishes.

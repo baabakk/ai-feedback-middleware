@@ -16,8 +16,8 @@ body:
     id: package
     attributes:
       label: Affected package(s)
-      description: e.g. @llm-feedback-middleware/core, @llm-feedback-middleware/postgres
-      placeholder: "@llm-feedback-middleware/core"
+      description: e.g. @ai-feedback-middleware/core, @ai-feedback-middleware/postgres
+      placeholder: "@ai-feedback-middleware/core"
     validations:
       required: true
 
@@ -25,7 +25,7 @@ body:
     id: version
     attributes:
       label: Version(s)
-      description: Output of `pnpm list @llm-feedback-middleware/core` (or your equivalent).
+      description: Output of `pnpm list @ai-feedback-middleware/core` (or your equivalent).
       placeholder: "0.1.0"
     validations:
       required: true

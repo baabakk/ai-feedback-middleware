@@ -1,23 +1,23 @@
-# @llm-feedback-middleware/postgres
+# @ai-feedback-middleware/postgres
 
-Postgres adapters for `llm-feedback-middleware`. Implements `EventStorePort` and `ProjectionStorePort`.
+Postgres adapters for `ai-feedback-middleware`. Implements `EventStorePort` and `ProjectionStorePort`.
 
 ## Install
 
 ```bash
-npm install @llm-feedback-middleware/postgres pg
+npm install @ai-feedback-middleware/postgres pg
 ```
 
 ## Use
 
 ```typescript
 import { Pool } from "pg";
-import { createFeedback, DEFAULT_ACTIONS } from "@llm-feedback-middleware/core";
+import { createFeedback, DEFAULT_ACTIONS } from "@ai-feedback-middleware/core";
 import {
   createPostgresEventStore,
   createPostgresProjectionStore,
   runMigrations,
-} from "@llm-feedback-middleware/postgres";
+} from "@ai-feedback-middleware/postgres";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -44,11 +44,11 @@ Migration SQL ships under `migrations/`. The `runMigrations(pool)` helper applie
 
 ## subscribeAll
 
-The Postgres adapter implements `subscribeAll` via polling (default 500ms). For higher-frequency or true push semantics, use the dedicated bus adapter (e.g., `@llm-feedback-middleware/redis-pubsub`) and reserve Postgres for durable storage.
+The Postgres adapter implements `subscribeAll` via polling (default 500ms). For higher-frequency or true push semantics, use the dedicated bus adapter (e.g., `@ai-feedback-middleware/redis-pubsub`) and reserve Postgres for durable storage.
 
 ## Conformance
 
-This adapter passes the full `runEventStoreConformance` and `runProjectionStoreConformance` suites from `@llm-feedback-middleware/adapter-conformance`.
+This adapter passes the full `runEventStoreConformance` and `runProjectionStoreConformance` suites from `@ai-feedback-middleware/adapter-conformance`.
 
 ## License
 

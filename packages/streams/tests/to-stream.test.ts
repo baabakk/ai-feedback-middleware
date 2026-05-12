@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { firstValueFrom, toArray, lastValueFrom } from "rxjs";
 import { take, filter, bufferCount } from "../src/operators.js";
 import { toStream, toEventStream } from "../src/index.js";
-import { createInMemoryEventBus } from "@llm-feedback-middleware/in-memory";
-import { makeEvent } from "@llm-feedback-middleware/adapter-conformance";
+import { createInMemoryEventBus } from "@ai-feedback-middleware/in-memory";
+import { makeReaction } from "@ai-feedback-middleware/adapter-conformance";
+
+const makeEvent = makeReaction;
 
 describe("toStream", () => {
   it("delivers events from the bus to a stream subscriber", async () => {
@@ -42,7 +44,7 @@ describe("toStream", () => {
 
     const got = lastValueFrom(
       stream.pipe(
-        filter((e) => e.action === "approve"),
+        filter((e) => e.event_kind === "reaction" && e.action === "approved"),
         take(2),
         toArray(),
       ),
@@ -52,9 +54,8 @@ describe("toStream", () => {
       "feedback.captured",
       makeEvent({
         event_id: "edit",
-        action: "edit",
-        polarity: "negative",
-        inference: "blacklist",
+        action: "manually_edited",
+        evaluations: { content: "negative" },
       }),
     );
     await bus.publish("feedback.captured", makeEvent({ event_id: "a1" }));
@@ -70,7 +71,7 @@ describe("toStream", () => {
 
     const got = lastValueFrom(
       stream.pipe(
-        filter((e) => e.action === "regenerate"),
+        filter((e) => e.event_kind === "reaction" && e.action === "regenerated"),
         bufferCount(3),
         take(1),
       ),
@@ -81,9 +82,8 @@ describe("toStream", () => {
         "feedback.captured",
         makeEvent({
           event_id: `r${i}`,
-          action: "regenerate",
-          polarity: "negative",
-          inference: "observe",
+          action: "regenerated",
+          evaluations: { detection: "positive", content: "negative" },
         }),
       );
     }

@@ -1,34 +1,13 @@
-import type { FeedbackEvent, CaptureInput, EventFilter } from "../event-types.js";
-
-export interface RebuildResult {
-  projectionName: string;
-  eventsProcessed: number;
-  durationMs: number;
-}
-
-export type Unsubscribe = () => Promise<void>;
-
 /**
- * The framework's public API. Consumer business logic imports this.
- *
- * One port covers both write (capture) and read (query, subscribe, rebuild).
- * No CQRS split at this interface level. If async / split-store CQRS is
- * needed later, this port can split into FeedbackCommandPort and
- * FeedbackQueryPort without breaking consumers materially.
+ * @deprecated Use `capture-port.ts` instead. The v1 `FeedbackPort` exposed
+ * a unified `capture()` method that 2.1 splits into four
+ * (`captureArtifact` / `recordReaction` / `cancelArtifact` /
+ * `recordCompetitiveSelection`). This module re-exports the new types under
+ * their old names so consumer imports continue resolving during the
+ * v0.2.x → v0.3.x bump.
  */
-export interface FeedbackPort {
-  /** Capture a feedback signal. Returns the new event_id. */
-  capture(input: CaptureInput): Promise<string>;
-
-  /** Read the raw event stream for a partition. */
-  readStream(partitionKey: string, fromVersion?: number): AsyncIterable<FeedbackEvent>;
-
-  /** Read all events matching a filter. */
-  readAll(filter?: EventFilter, pageSize?: number): AsyncIterable<FeedbackEvent>;
-
-  /** Rebuild a projection from the event log (admin operation). */
-  rebuildProjection(name: string): Promise<RebuildResult>;
-
-  /** Query the current state of a registered projection. */
-  queryProjection<T = unknown>(name: string, filter: unknown, pageSize?: number): Promise<T[]>;
-}
+export type {
+  CapturePort as FeedbackPort,
+  RebuildResult,
+  Unsubscribe,
+} from "./capture-port.js";

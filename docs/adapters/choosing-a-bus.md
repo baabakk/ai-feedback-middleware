@@ -8,10 +8,10 @@ correctness.
 
 ## Decision tree
 
-1. **Single process, tests, prototypes:** `@llm-feedback-middleware/in-memory`.
+1. **Single process, tests, prototypes:** `@ai-feedback-middleware/in-memory`.
    Zero infrastructure. No durability. Subscribers in the same process.
 2. **Cross-process, single Redis, OK with at-most-once:**
-   `@llm-feedback-middleware/redis-pubsub`. Lightest cross-process
+   `@ai-feedback-middleware/redis-pubsub`. Lightest cross-process
    option. If a subscriber is down, it misses messages that fire while
    it is down. Subscribers can backfill from the event store on startup.
 3. **At-least-once required:** Kafka or Redis Streams. No reference
@@ -28,7 +28,7 @@ Each adapter declares a `SubscribeCapabilities` object listing supported
 consumer asks for something the adapter cannot honor:
 
 ```typescript
-import { createInMemoryEventBus } from "@llm-feedback-middleware/in-memory";
+import { createInMemoryEventBus } from "@ai-feedback-middleware/in-memory";
 
 const bus = createInMemoryEventBus();
 // Throws: 'createInMemoryEventBus does not support deliveryMode="at-least-once"'.

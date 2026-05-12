@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { EventBusPort, FeedbackEvent, OutboxPort } from "@llm-feedback-middleware/core";
+import type { EventBusPort, FeedbackEvent, OutboxPort } from "@ai-feedback-middleware/core";
 
 export interface OutboxScannerOptions {
   outbox: OutboxPort;

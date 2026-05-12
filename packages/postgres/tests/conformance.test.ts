@@ -4,14 +4,18 @@ import {
   runEventStoreConformance,
   runProjectionStoreConformance,
   runOutboxConformance,
-  runInferenceRulesConformance,
-  makeEvent,
-} from "@llm-feedback-middleware/adapter-conformance";
+  runActionabilityRulesConformance,
+  runTrackedArtifactsConformance,
+  runActionabilityDecisionsConformance,
+  makeReaction,
+} from "@ai-feedback-middleware/adapter-conformance";
 import {
   createPostgresEventStore,
   createPostgresProjectionStore,
   createPostgresOutbox,
-  createPostgresInferenceRulesStore,
+  createPostgresActionabilityRulesStore,
+  createPostgresTrackedArtifactsStore,
+  createPostgresActionabilityDecisionsStore,
   runMigrations,
 } from "../src/index.js";
 
@@ -22,7 +26,7 @@ const connectionString = process.env.FEEDBACK_TEST_DATABASE_URL ?? process.env.T
 const skip = !connectionString;
 
 if (skip) {
-  describe.skip("@llm-feedback-middleware/postgres conformance", () => {
+  describe.skip("@ai-feedback-middleware/postgres conformance", () => {
     it("skipped: set FEEDBACK_TEST_DATABASE_URL or TEST_DATABASE_URL to run Postgres tests", () => {
       // intentionally empty
     });
@@ -33,18 +37,36 @@ if (skip) {
   beforeAll(async () => {
     pool = new Pool({ connectionString });
     await runMigrations(pool);
+
+    // The conformance suites exercise each port in isolation; e.g. the
+    // EventStorePort suite appends reaction events without seeding their
+    // parent captured_artifacts row, and the TrackedArtifactsPort suite
+    // calls markTerminal with a synthetic reaction event_id that does not
+    // exist in `captured_evaluated_reactions`. Both are valid in-isolation
+    // tests of those ports, but Postgres enforces real FKs that the
+    // in-memory adapter doesn't. Drop those FKs for the duration of the
+    // test run so the in-isolation contract can be verified. The
+    // constraints stay in production migrations.
+    await pool.query(
+      "ALTER TABLE captured_evaluated_reactions DROP CONSTRAINT IF EXISTS captured_evaluated_reactions_artifact_id_fkey",
+    );
+    await pool.query(
+      "ALTER TABLE tracked_artifacts DROP CONSTRAINT IF EXISTS tracked_artifacts_terminal_reaction_event_id_fkey",
+    );
   });
 
   afterAll(async () => {
     if (pool) await pool.end();
   });
 
-  // Event store conformance: each test runs against a freshly truncated table.
+  // Event store conformance: truncate both immutable tables between tests.
   runEventStoreConformance({
     name: "PostgresEventStore",
     factory: () => createPostgresEventStore({ pool: pool!, subscribePollMs: 50 }),
     cleanup: async () => {
-      await pool!.query("TRUNCATE TABLE feedback_events RESTART IDENTITY CASCADE");
+      // Reactions FK -> captures, so drop reactions first.
+      await pool!.query("TRUNCATE TABLE captured_evaluated_reactions RESTART IDENTITY CASCADE");
+      await pool!.query("TRUNCATE TABLE captured_artifacts RESTART IDENTITY CASCADE");
     },
     supportsSubscribe: true,
   });
@@ -58,54 +80,49 @@ if (skip) {
     },
   });
 
-  // Outbox conformance: requires feedback_events parent rows because of FK.
-  // Pre-seed parent events for each test, then truncate everything between tests.
+  // Outbox conformance.
   runOutboxConformance({
     name: "PostgresOutbox",
-    factory: async () => {
-      // Outbox FK requires the event_id to exist in feedback_events first.
-      // Seed a wide range of dummy parent rows to cover any event_ids the
-      // conformance suite generates.
-      const eventStore = createPostgresEventStore({ pool: pool! });
-      // The conformance suite generates event_ids like "e1", "e-N", "with-payload", etc.
-      // Easier to drop the FK constraint just for the duration of these tests.
-      await pool!.query(
-        "ALTER TABLE feedback_outbox DROP CONSTRAINT IF EXISTS feedback_outbox_event_id_fkey",
-      );
-      void eventStore;
-      return createPostgresOutbox({ pool: pool! });
-    },
+    factory: () => createPostgresOutbox({ pool: pool! }),
     cleanup: async () => {
       await pool!.query("TRUNCATE TABLE feedback_outbox");
     },
   });
 
-  // Inference rules conformance.
-  runInferenceRulesConformance({
-    name: "PostgresInferenceRulesStore",
-    factory: () => createPostgresInferenceRulesStore({ pool: pool! }),
+  // Actionability rules conformance.
+  runActionabilityRulesConformance({
+    name: "PostgresActionabilityRulesStore",
+    factory: () => createPostgresActionabilityRulesStore({ pool: pool! }),
     cleanup: async () => {
-      await pool!.query("TRUNCATE TABLE feedback_inference_rules");
+      await pool!.query("TRUNCATE TABLE actionability_rules");
     },
   });
 
-  // Restore the FK after the outbox conformance suite runs (best-effort; not
-  // strictly necessary because subsequent test runs re-create the schema via
-  // runMigrations, but tidy).
-  afterAll(async () => {
-    if (!pool) return;
-    try {
-      await pool.query(
-        `ALTER TABLE feedback_outbox
-         ADD CONSTRAINT feedback_outbox_event_id_fkey
-         FOREIGN KEY (event_id) REFERENCES feedback_events(event_id) ON DELETE CASCADE`,
+  // Tracked artifacts conformance. The conformance suite asserts the port in
+  // isolation — without paired captured_artifacts rows. Drop the FK for the
+  // duration of these tests so insertWaiting can stand alone.
+  runTrackedArtifactsConformance({
+    name: "PostgresTrackedArtifactsStore",
+    factory: async () => {
+      await pool!.query(
+        "ALTER TABLE tracked_artifacts DROP CONSTRAINT IF EXISTS tracked_artifacts_artifact_id_fkey",
       );
-    } catch {
-      // Ignore — the constraint may already exist if the suite was interrupted.
-    }
+      return createPostgresTrackedArtifactsStore({ pool: pool! });
+    },
+    cleanup: async () => {
+      await pool!.query("TRUNCATE TABLE tracked_artifacts");
+    },
   });
 
-  // Suppress lint about unused import — used to silence dead-code warnings for makeEvent
-  // when the suite is skipped.
-  void makeEvent;
+  // Actionability decisions conformance.
+  runActionabilityDecisionsConformance({
+    name: "PostgresActionabilityDecisionsStore",
+    factory: () => createPostgresActionabilityDecisionsStore({ pool: pool! }),
+    cleanup: async () => {
+      await pool!.query("TRUNCATE TABLE actionability_decisions");
+    },
+  });
+
+  // Suppress lint about unused import.
+  void makeReaction;
 }

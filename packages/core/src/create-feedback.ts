@@ -1,99 +1,114 @@
 import { ActionRegistry, type FeedbackActionDefinition } from "./registry/actions.js";
 import { ArtifactTypeRegistry, type ArtifactTypeDefinition } from "./registry/artifact-types.js";
-import { classify, type ClassifierContext } from "./classifier.js";
+import { evaluateReaction, DEFAULT_CLASSIFIER_VERSION } from "./classifier.js";
+import { evaluateRules, type ActionabilityDecision } from "./inference-engine.js";
 import { ProjectionEngine, type ProjectionBuilder } from "./projection-engine.js";
 import type { EventStorePort } from "./ports/event-store-port.js";
 import type { ProjectionStorePort } from "./ports/projection-store-port.js";
-import type { FeedbackPort, RebuildResult } from "./ports/feedback-port.js";
+import type { CapturePort, RebuildResult } from "./ports/capture-port.js";
 import type { EventBusPort } from "./ports/event-bus-port.js";
-import { topicsFor } from "./ports/event-bus-port.js";
+import { topicsFor, topicsForActionabilityDecision } from "./ports/event-bus-port.js";
 import type { OutboxPort } from "./ports/outbox-port.js";
-import type { InferenceRulesPort, InferenceRule } from "./ports/inference-rules-port.js";
+import type { ActionabilityRulesPort } from "./ports/actionability-rules-port.js";
+import type { ActionabilityDecisionsStore } from "./ports/actionability-decisions-store-port.js";
+import type { TrackedArtifactsPort } from "./ports/tracked-artifacts-port.js";
 import type { Middleware } from "./middleware/types.js";
-import type { FeedbackEvent, CaptureInput, EventFilter, Provenance } from "./event-types.js";
-import { type EventUpcaster, upcastStream, validateUpcasterChain } from "./upcaster.js";
+import type {
+  ActionabilityFilter,
+  ArtifactFilter,
+  CancelArtifactInput,
+  CaptureArtifactInput,
+  CaptureArtifactResult,
+  CapturedArtifactEvent,
+  CapturedEvaluatedReactionEvent,
+  CompetitiveSelectionInput,
+  FeedbackEvent,
+  Provenance,
+  ReactionFilter,
+  RecordReactionInput,
+  RecordReactionResult,
+  Source,
+} from "./event-types.js";
+import { type EventUpcaster, validateUpcasterChain } from "./upcaster.js";
 
+/**
+ * createFeedback composition options. See spec §6.1.
+ */
 export interface CreateFeedbackOptions {
   eventStore: EventStorePort;
   projectionStore: ProjectionStorePort;
+  trackedArtifacts: TrackedArtifactsPort;
   actions: FeedbackActionDefinition[];
   artifactTypes: ArtifactTypeDefinition[];
   projections?: ProjectionBuilder[];
 
   /** Optional event bus. When provided, events are published after commit. */
   eventBus?: EventBusPort;
-  /**
-   * Optional transactional outbox. When provided alongside eventBus, events
-   * are enqueued in the same transaction as the event log append, and an
-   * external scanner is responsible for actually publishing.
-   *
-   * Without an outbox, the framework publishes directly after commit, which
-   * is best-effort (a process crash between commit and publish loses the bus
-   * notification — but the event is still durable in the log).
-   */
+  /** Optional transactional outbox; when provided, drives publishing. */
   outbox?: OutboxPort;
-  /** Optional inference rules store. Loaded on capture for threshold-based classification. */
-  inferenceRules?: InferenceRulesPort;
+  /** Optional actionability rules store, read by Layer 4 inline. */
+  actionabilityRules?: ActionabilityRulesPort;
+  /** Optional actionability decisions store. Required for inline Layer 4. */
+  actionabilityDecisions?: ActionabilityDecisionsStore;
   /**
-   * History window (ms) consulted when evaluating inference rules. Defaults
-   * to 30 days. The framework reads recent events on the same partition
-   * within this window and feeds them to the classifier.
+   * Sliding window (ms) consulted when evaluating actionability rules in
+   * Layer 4. Defaults to 30 days. Adapter is responsible for indexing
+   * `occurred_at` so the cutoff query is cheap.
    */
-  historyWindowMs?: number;
+  actionabilityWindowMs?: number;
 
   /**
    * Optional middleware applied to direct bus publishes (when no outbox is
    * configured). Composed in order: middlewares[0] wraps middlewares[1] etc.
-   * The innermost handler calls eventBus.publish for each topic.
    */
   publishMiddleware?: Middleware<FeedbackEvent>[];
 
-  /**
-   * Optional callback fired when the post-commit direct publish fails. When
-   * an outbox is configured, the direct publish is a best-effort fast path
-   * and failures are otherwise silent (the outbox scanner will retry). Wire
-   * this to a logger/metrics system to gain visibility.
-   *
-   * If no outbox is configured, capture() throws on publish failure
-   * regardless of this callback.
-   */
+  /** Callback fired when post-commit publish fails (visibility). */
   onPublishError?: (event: FeedbackEvent, err: unknown) => void;
 
-  /** Schema version emitted on new events. Defaults to 1. */
+  /** Schema version emitted on new events. Defaults to 2 (2.1). */
   currentSchemaVersion?: number;
-  /**
-   * Optional upcasters that translate older events to the current schema
-   * version on read. Must form a contiguous chain v1 -> v2 -> ... ->
-   * currentSchemaVersion. Validated at composition time.
-   */
+
+  /** Optional upcasters that translate older events to currentSchemaVersion. */
   upcasters?: EventUpcaster[];
-  /** Default partition_key strategy when CaptureInput.partition_key is absent. */
-  defaultPartitionKey?: (input: CaptureInput) => string;
-  /** Optional ID generator (defaults to crypto.randomUUID). */
+
+  /** Default partition_key strategy. Defaults to `(input) => input.artifact_id`. */
+  defaultPartitionKey?: (input: CaptureArtifactInput) => string;
+
+  /** Optional ID generators (defaults to crypto.randomUUID). */
   generateEventId?: () => string;
+  generateArtifactId?: () => string;
+
+  /**
+   * Identifier for the classifier rule pack used; embedded as
+   * `classifier_version` on every reaction event. Defaults to
+   * `DEFAULT_CLASSIFIER_VERSION`.
+   */
+  classifierVersion?: string;
 }
 
 /**
- * Compose the framework: stores + registries + projection engine + optional
- * bus/outbox/rules into a FeedbackPort.
+ * Compose the framework into a {@link CapturePort} consumer-facing facade.
+ *
+ * See spec §7 for API semantics and §11–§12 for layer responsibilities.
  */
-export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
+export function createFeedback(options: CreateFeedbackOptions): CapturePort {
   const actionRegistry = new ActionRegistry(options.actions);
   const artifactTypeRegistry = new ArtifactTypeRegistry(options.artifactTypes);
   const projectionEngine = new ProjectionEngine(options.projectionStore, options.projections ?? []);
-  const schemaVersion = options.currentSchemaVersion ?? 1;
+  const schemaVersion = options.currentSchemaVersion ?? 2;
   const upcasters = options.upcasters ?? [];
   validateUpcasterChain(upcasters, schemaVersion);
-  const generateId = options.generateEventId ?? defaultIdGenerator;
-  const partitionKey = options.defaultPartitionKey ?? ((input) => input.artifact_id);
-  const historyWindowMs = options.historyWindowMs ?? 30 * 24 * 60 * 60 * 1000;
+  const generateEventId = options.generateEventId ?? defaultIdGenerator("evt");
+  const generateArtifactId = options.generateArtifactId ?? defaultIdGenerator("art");
+  const partitionKey = options.defaultPartitionKey ?? ((input) => input.artifact_id ?? "");
+  const classifierVersion = options.classifierVersion ?? DEFAULT_CLASSIFIER_VERSION;
+  const actionabilityWindowMs = options.actionabilityWindowMs ?? 30 * 24 * 60 * 60 * 1000;
 
-  // Build the publish pipeline once at composition time.
   const publishHandler = buildPublishHandler(options.eventBus, options.publishMiddleware);
 
-  const port: FeedbackPort = {
-    async capture(input: CaptureInput): Promise<string> {
-      const action = actionRegistry.get(input.action);
+  const port: CapturePort = {
+    async captureArtifact(input: CaptureArtifactInput): Promise<CaptureArtifactResult> {
       if (!artifactTypeRegistry.has(input.artifact_type)) {
         throw new Error(
           `Unknown artifact type: ${input.artifact_type}. Registered: ${artifactTypeRegistry
@@ -102,106 +117,287 @@ export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
             .join(", ")}`,
         );
       }
-
-      const validatedPayload = action.payloadSchema.parse(input.payload);
-      const pk = input.partition_key ?? partitionKey(input);
-
-      // Load rules + history for the classifier (only when rules store provided).
-      let rules: InferenceRule[] = [];
-      let history: ReadonlyArray<{ action: string; timestamp: string }> = [];
-      if (options.inferenceRules) {
-        rules = await options.inferenceRules.list();
-        if (rules.length > 0) {
-          history = await loadHistory(options.eventStore, pk, historyWindowMs);
-        }
+      if (!input.expires_at) {
+        throw new Error(
+          `captureArtifact: expires_at is REQUIRED on every governed artifact. ` +
+            `Set it to the deadline at which the Lifecycle Worker should fire ` +
+            `silently_accepted or silently_rejected_expired per the artifact ` +
+            `type's expirationPolicy.`,
+        );
       }
 
-      const classifierContext: ClassifierContext = {
-        task_type: input.task_type,
-        producer: input.producer,
-        artifact_type: input.artifact_type,
-        rules,
-        history,
-      };
-      const { polarity, inference } = classify(action, validatedPayload, classifierContext);
-
+      const artifact_id = input.artifact_id ?? generateArtifactId();
+      const event_id = generateEventId();
       const now = new Date().toISOString();
-      const provenance: Provenance = {
-        channel: input.provenance?.channel ?? "system",
-        captured_by_adapter: input.provenance?.captured_by_adapter ?? "unknown",
-        ...(input.provenance?.instance_id !== undefined && {
-          instance_id: input.provenance.instance_id,
-        }),
-        ...(input.provenance?.latency_ms !== undefined && {
-          latency_ms: input.provenance.latency_ms,
-        }),
-      };
+      const occurred_at = input.occurred_at ?? now;
+      const pk = input.partition_key ?? partitionKey({ ...input, artifact_id });
+      const provenance = mergeProvenance(input.provenance);
 
-      const event: FeedbackEvent = {
-        event_id: generateId(),
+      const event: CapturedArtifactEvent = {
+        event_kind: "capture",
+        event_id,
         event_version: schemaVersion,
-        timestamp: input.timestamp ?? now,
-        captured_at: now,
-        partition_key: pk,
-        source: input.source ?? action.source,
-        polarity,
-        inference,
-        action: input.action,
+        artifact_id,
         artifact_type: input.artifact_type,
-        artifact_id: input.artifact_id,
         artifact_version: input.artifact_version,
+        partition_key: pk,
         producer: input.producer,
         task_type: input.task_type,
-        payload: validatedPayload,
+        expires_at: input.expires_at,
+        occurred_at,
+        captured_at: now,
+        payload: input.payload,
         provenance,
-        ...(input.correction_of !== undefined && { correction_of: input.correction_of }),
-        ...(input.correlates_with !== undefined && { correlates_with: input.correlates_with }),
+        ...(input.previous_artifact_id !== undefined && {
+          previous_artifact_id: input.previous_artifact_id,
+        }),
       };
 
-      // Durable + sync projections + outbox in one transaction.
       const topics = topicsFor(event);
       await options.eventStore.withTransaction(async (tx) => {
         await options.eventStore.append(event, tx);
+        await options.trackedArtifacts.insertWaiting(
+          {
+            artifact_id,
+            artifact_type: input.artifact_type,
+            artifact_version: input.artifact_version,
+            partition_key: pk,
+            producer: input.producer,
+            task_type: input.task_type,
+            status: "waiting",
+            expires_at: input.expires_at,
+            created_at: now,
+          },
+          tx,
+        );
         await projectionEngine.applySync(event, tx);
         if (options.outbox) {
-          await options.outbox.enqueue(event, topics, tx);
+          await options.outbox.enqueue(event, topics, artifact_id, tx);
         }
       });
 
-      // After commit: publish (best-effort if no outbox; redundant-best-effort if outbox).
-      if (options.eventBus && publishHandler) {
+      await publishAfterCommit(event, options, publishHandler);
+
+      return { artifact_id, event_id, captured_at: now };
+    },
+
+    async recordReaction(input: RecordReactionInput): Promise<RecordReactionResult> {
+      const action = actionRegistry.get(input.action);
+      const tracked = await options.trackedArtifacts.getByArtifactId(input.artifact_id);
+      if (!tracked) {
+        throw new Error(
+          `recordReaction: no tracked artifact for artifact_id=${input.artifact_id}. ` +
+            `Call captureArtifact first to open the lifecycle.`,
+        );
+      }
+
+      // Layer 3 — Reaction Evaluation, inline.
+      const evaluations = evaluateReaction(
+        action,
+        input.payload,
+        {
+          classifier_version: classifierVersion,
+          artifact_type: tracked.artifact_type,
+        },
+        input.evaluations_override,
+      );
+
+      const event_id = generateEventId();
+      const now = new Date().toISOString();
+      const occurred_at = input.occurred_at ?? now;
+      const provenance = mergeProvenance(input.provenance);
+      const source: Source = input.source_override ?? action.source;
+
+      const reaction: CapturedEvaluatedReactionEvent = {
+        event_kind: "reaction",
+        event_id,
+        event_version: schemaVersion,
+        artifact_id: input.artifact_id,
+        artifact_type: tracked.artifact_type,
+        artifact_version: tracked.artifact_version,
+        partition_key: tracked.partition_key,
+        producer: tracked.producer,
+        task_type: tracked.task_type,
+        source,
+        action: action.name,
+        evaluations,
+        classifier_version: classifierVersion,
+        occurred_at,
+        captured_at: now,
+        payload: input.payload ?? {},
+        provenance,
+        ...(input.correction_of_event_id !== undefined && {
+          correction_of_event_id: input.correction_of_event_id,
+        }),
+        ...(input.successor_artifact_id !== undefined && {
+          successor_artifact_id: input.successor_artifact_id,
+        }),
+      };
+
+      const terminalStatus = terminalStatusForAction(action.name);
+      const topics = topicsFor(reaction);
+      let inlineDecisions: ActionabilityDecision[] = [];
+
+      await options.eventStore.withTransaction(async (tx) => {
+        await options.eventStore.append(reaction, tx);
+        if (terminalStatus) {
+          await options.trackedArtifacts.markTerminal(
+            input.artifact_id,
+            terminalStatus,
+            event_id,
+            now,
+            tx,
+          );
+        }
+        await projectionEngine.applySync(reaction, tx);
+
+        // Layer 4 — Actionable Result Inference, inline.
+        if (options.actionabilityRules && options.actionabilityDecisions) {
+          inlineDecisions = await runInlineLayer4(
+            {
+              reactionJustWritten: reaction,
+              actionabilityRules: options.actionabilityRules,
+              eventStore: options.eventStore,
+              actionabilityWindowMs,
+              now,
+            },
+            tx,
+          );
+          if (inlineDecisions.length > 0) {
+            await options.actionabilityDecisions.appendBatch(inlineDecisions, tx);
+          }
+        }
+
         if (options.outbox) {
-          // Outbox is the authority; treat direct publish as a best-effort fast path.
-          // The outbox scanner will retry on failure, but we surface the error via
-          // onPublishError so operators can see bus degradation before the backlog grows.
-          publishHandler(event).catch((err) => {
-            if (options.onPublishError) options.onPublishError(event, err);
+          await options.outbox.enqueue(reaction, topics, input.artifact_id, tx);
+        }
+      });
+
+      await publishAfterCommit(reaction, options, publishHandler);
+
+      // Per-axis inference topics — emit after commit so subscribers see only
+      // durably-persisted decisions.
+      if (options.eventBus && inlineDecisions.length > 0) {
+        for (const decision of inlineDecisions) {
+          const decisionTopics = topicsForActionabilityDecision({
+            axis: decision.axis,
+            inference: decision.inference,
+            artifact_type: reaction.artifact_type,
           });
-        } else {
-          // No outbox: direct publish is the only delivery path. Errors propagate.
-          // We still call onPublishError if provided so callers can log before the throw.
-          try {
-            await publishHandler(event);
-          } catch (err) {
-            if (options.onPublishError) options.onPublishError(event, err);
-            throw err;
+          for (const topic of decisionTopics) {
+            // Decisions are not FeedbackEvents; we publish them as opaque
+            // payloads so subscribers filtering on `feedback.inference.*`
+            // can ingest. Adapters that strictly require FeedbackEvent on
+            // their bus may filter these out; the topic prefix is canonical.
+            void options.eventBus
+              .publish(topic, decision as unknown as FeedbackEvent)
+              .catch((err) => {
+                if (options.onPublishError) {
+                  options.onPublishError(decision as unknown as FeedbackEvent, err);
+                }
+              });
           }
         }
       }
 
-      return event.event_id;
+      return { event_id, evaluations };
     },
 
-    readStream(partitionKey: string, fromVersion?: number): AsyncIterable<FeedbackEvent> {
-      return upcastStream(
-        options.eventStore.readStream(partitionKey, fromVersion),
-        upcasters,
-        schemaVersion,
+    async cancelArtifact(input: CancelArtifactInput): Promise<{ event_id: string }> {
+      const result = await port.recordReaction({
+        artifact_id: input.artifact_id,
+        action: "cancelled",
+        payload: { reason: input.reason, ...(input.metadata ?? {}) },
+        ...(input.occurred_at !== undefined && { occurred_at: input.occurred_at }),
+      });
+      return { event_id: result.event_id };
+    },
+
+    async recordCompetitiveSelection(
+      input: CompetitiveSelectionInput,
+    ): Promise<{ event_ids: string[] }> {
+      if (!input.alternatives.includes(input.chosen)) {
+        throw new Error(
+          `recordCompetitiveSelection: chosen "${input.chosen}" is not in alternatives [${input.alternatives.join(", ")}]`,
+        );
+      }
+      const event_ids: string[] = [];
+      for (const candidate of input.alternatives) {
+        const isChosen = candidate === input.chosen;
+        const competitors = input.alternatives.filter((a) => a !== candidate);
+        const action = isChosen ? "approved" : "not_selected_from_list";
+        const result = await port.recordReaction({
+          artifact_id: candidate,
+          action,
+          payload: {
+            competitors,
+            chosen: input.chosen,
+            ...(input.selection_method !== undefined && {
+              selection_method: input.selection_method,
+            }),
+            ...((input.payload as object | undefined) ?? {}),
+          },
+          ...(input.occurred_at !== undefined && { occurred_at: input.occurred_at }),
+        });
+        event_ids.push(result.event_id);
+      }
+      return { event_ids };
+    },
+
+    readCapturedArtifacts(filter?: ArtifactFilter): AsyncIterable<CapturedArtifactEvent> {
+      const baseFilter = {
+        event_kind: "capture" as const,
+        ...(filter?.artifact_type !== undefined && { artifact_type: filter.artifact_type }),
+        ...(filter?.producer !== undefined && { producer: filter.producer }),
+        ...(filter?.task_type !== undefined && { task_type: filter.task_type }),
+        ...(filter?.partition_key !== undefined && { partition_key: filter.partition_key }),
+        ...(filter?.from_timestamp !== undefined && { from_timestamp: filter.from_timestamp }),
+        ...(filter?.to_timestamp !== undefined && { to_timestamp: filter.to_timestamp }),
+      };
+      return filterIterable(
+        options.eventStore.readAll(baseFilter),
+        (e): e is CapturedArtifactEvent => e.event_kind === "capture",
       );
     },
 
-    readAll(filter?: EventFilter, pageSize?: number): AsyncIterable<FeedbackEvent> {
-      return upcastStream(options.eventStore.readAll(filter, pageSize), upcasters, schemaVersion);
+    readReactions(filter?: ReactionFilter): AsyncIterable<CapturedEvaluatedReactionEvent> {
+      const baseFilter = {
+        event_kind: "reaction" as const,
+        ...(filter?.source !== undefined && { source: filter.source }),
+        ...(filter?.action !== undefined && { action: filter.action }),
+        ...(filter?.artifact_type !== undefined && { artifact_type: filter.artifact_type }),
+        ...(filter?.producer !== undefined && { producer: filter.producer }),
+        ...(filter?.task_type !== undefined && { task_type: filter.task_type }),
+        ...(filter?.partition_key !== undefined && { partition_key: filter.partition_key }),
+        ...(filter?.from_timestamp !== undefined && { from_timestamp: filter.from_timestamp }),
+        ...(filter?.to_timestamp !== undefined && { to_timestamp: filter.to_timestamp }),
+      };
+      const stream = filterIterable(
+        options.eventStore.readAll(baseFilter),
+        (e): e is CapturedEvaluatedReactionEvent => e.event_kind === "reaction",
+      );
+      // Optional client-side axis-polarity filter (cheap; adapter hint optional).
+      if (filter?.axis_polarity) {
+        const { axis, polarity } = filter.axis_polarity;
+        return (async function* () {
+          for await (const r of stream) {
+            if (r.evaluations[axis] === polarity) yield r;
+          }
+        })();
+      }
+      return stream;
+    },
+
+    readActionableDecisions(
+      filter?: ActionabilityFilter,
+    ): AsyncIterable<ActionabilityDecision> {
+      if (!options.actionabilityDecisions) {
+        throw new Error(
+          "readActionableDecisions: no ActionabilityDecisionsStore was wired. " +
+            "Pass `actionabilityDecisions` to createFeedback() to enable Layer 4 reads.",
+        );
+      }
+      return options.actionabilityDecisions.read(filter);
     },
 
     async rebuildProjection(name: string): Promise<RebuildResult> {
@@ -227,10 +423,53 @@ export function createFeedback(options: CreateFeedbackOptions): FeedbackPort {
   return port;
 }
 
+// ---------- Helpers -------------------------------------------------------
+
+function mergeProvenance(input: Partial<Provenance> | undefined): Provenance {
+  return {
+    channel: input?.channel ?? "system",
+    captured_by_adapter: input?.captured_by_adapter ?? "unknown",
+    ...(input?.instance_id !== undefined && { instance_id: input.instance_id }),
+    ...(input?.latency_ms !== undefined && { latency_ms: input.latency_ms }),
+  };
+}
+
 /**
- * Build the post-commit publish handler. Composes user middleware around
- * a final handler that fans out to all topics for the event.
+ * Map an action name to the terminal `tracked_artifacts.status` it implies.
+ * Returns `null` for actions that do not transition the lifecycle (corrected,
+ * regenerated, etc.).
  */
+function terminalStatusForAction(
+  action: string,
+):
+  | "reacted"
+  | "silently_accepted"
+  | "silently_rejected_expired"
+  | "cancelled"
+  | "superseded"
+  | null {
+  switch (action) {
+    case "approved":
+    case "manually_edited":
+    case "rejected":
+    case "not_selected_from_list":
+    case "mute_triggered":
+    case "manually_replaced":
+    case "internally_unobserved_externally_completed":
+      return "reacted";
+    case "silently_accepted":
+      return "silently_accepted";
+    case "silently_rejected_expired":
+      return "silently_rejected_expired";
+    case "cancelled":
+      return "cancelled";
+    case "superseded_by":
+      return "superseded";
+    default:
+      return null;
+  }
+}
+
 function buildPublishHandler(
   eventBus: EventBusPort | undefined,
   middlewares: Middleware<FeedbackEvent>[] | undefined,
@@ -245,39 +484,90 @@ function buildPublishHandler(
   if (!middlewares || middlewares.length === 0) {
     return finalHandler;
   }
-  // Compose middlewares: [a, b, c] => a(b(c(final)))
   return middlewares.reduceRight<(event: FeedbackEvent) => Promise<void>>(
     (next, mw) => mw(next),
     finalHandler,
   );
 }
 
-/**
- * Load recent history for a partition within a window.
- *
- * Uses `EventStorePort.readStreamSince(partitionKey, sinceTimestamp)` so the
- * cutoff filter pushes to the storage layer. Avoids pulling the full
- * partition stream into memory for hot artifacts.
- */
-async function loadHistory(
-  eventStore: EventStorePort,
-  partitionKey: string,
-  windowMs: number,
-): Promise<Array<{ action: string; timestamp: string }>> {
-  const sinceTimestamp = new Date(Date.now() - windowMs).toISOString();
-  const out: Array<{ action: string; timestamp: string }> = [];
-  for await (const e of eventStore.readStreamSince(partitionKey, sinceTimestamp)) {
-    out.push({ action: e.action, timestamp: e.timestamp });
+function publishAfterCommit(
+  event: FeedbackEvent,
+  options: CreateFeedbackOptions,
+  publishHandler: ((event: FeedbackEvent) => Promise<void>) | null,
+): Promise<void> {
+  if (!options.eventBus || !publishHandler) return Promise.resolve();
+  if (options.outbox) {
+    // Outbox is the authority. Direct publish is best-effort; failures surface
+    // via onPublishError but do not throw — the outbox scanner will retry.
+    return publishHandler(event).catch((err) => {
+      if (options.onPublishError) options.onPublishError(event, err);
+    });
   }
-  return out;
+  return publishHandler(event).catch((err) => {
+    if (options.onPublishError) options.onPublishError(event, err);
+    throw err;
+  });
 }
 
-function defaultIdGenerator(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+async function* filterIterable<TIn, TOut extends TIn>(
+  source: AsyncIterable<TIn>,
+  predicate: (value: TIn) => value is TOut,
+): AsyncIterable<TOut> {
+  for await (const value of source) {
+    if (predicate(value)) yield value;
   }
-  // Last-resort fallback (should never run on supported Node versions)
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `evt-${ts}-${rand}`;
+}
+
+function defaultIdGenerator(prefix: string): () => string {
+  return () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  };
+}
+
+/**
+ * Layer 4 inline computation. Loads recent reactions on the same partition,
+ * collects tombstoned artifact ids, applies every active rule, and returns
+ * the resulting decisions. Caller appends them inside the transaction.
+ */
+async function runInlineLayer4(
+  ctx: {
+    reactionJustWritten: CapturedEvaluatedReactionEvent;
+    actionabilityRules: ActionabilityRulesPort;
+    eventStore: EventStorePort;
+    actionabilityWindowMs: number;
+    now: string;
+  },
+  tx: unknown,
+): Promise<ActionabilityDecision[]> {
+  const rules = await ctx.actionabilityRules.list();
+  const activeRules = rules.filter((r) => r.active);
+  if (activeRules.length === 0) return [];
+
+  const sinceMs = Date.parse(ctx.now) - ctx.actionabilityWindowMs;
+  const since_timestamp = new Date(sinceMs).toISOString();
+
+  const candidates = await ctx.eventStore.readRecentReactions({
+    partition_key: ctx.reactionJustWritten.partition_key,
+    artifact_type: ctx.reactionJustWritten.artifact_type,
+    since_timestamp,
+    tx,
+  });
+
+  // Include the just-written reaction; some adapters won't see it yet within
+  // the same tx depending on isolation level.
+  const seenIds = new Set(candidates.map((c) => c.event_id));
+  if (!seenIds.has(ctx.reactionJustWritten.event_id)) {
+    candidates.push(ctx.reactionJustWritten);
+  }
+
+  const candidateArtifactIds = Array.from(new Set(candidates.map((c) => c.artifact_id)));
+  const tombstoned = await ctx.eventStore.readTombstonedArtifactIds({
+    candidate_artifact_ids: candidateArtifactIds,
+    tx,
+  });
+
+  return evaluateRules(activeRules, candidates, tombstoned, { now: ctx.now });
 }

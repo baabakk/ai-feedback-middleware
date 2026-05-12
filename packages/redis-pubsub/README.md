@@ -1,17 +1,17 @@
-# @llm-feedback-middleware/redis-pubsub
+# @ai-feedback-middleware/redis-pubsub
 
 Redis pub/sub adapter for `EventBusPort`.
 
 ## Install
 
 ```bash
-npm install @llm-feedback-middleware/redis-pubsub ioredis
+npm install @ai-feedback-middleware/redis-pubsub ioredis
 ```
 
 ## Use
 
 ```typescript
-import { createRedisPubSubEventBus } from "@llm-feedback-middleware/redis-pubsub";
+import { createRedisPubSubEventBus } from "@ai-feedback-middleware/redis-pubsub";
 
 const bus = createRedisPubSubEventBus({
   connection: process.env.REDIS_URL ?? "redis://localhost:6379",
@@ -31,7 +31,7 @@ await bus.close();
 
 ## Properties
 
-- **At-most-once delivery.** Subscribers down at publish time miss messages. Use `@llm-feedback-middleware/redis-streams` (F2 follow-up) if you need at-least-once with retention.
+- **At-most-once delivery.** Subscribers down at publish time miss messages. Use `@ai-feedback-middleware/redis-streams` (F2 follow-up) if you need at-least-once with retention.
 - **No global ordering.** Per-channel only.
 - **Wildcards.** `*` matches one segment, `>` matches the rest. Internally maps to Redis `PSUBSCRIBE` with pattern matching plus a local matcher for precision.
 - **Two connections.** Redis pub/sub takes the subscriber connection out of normal command mode, so the adapter creates separate publisher and subscriber clients.

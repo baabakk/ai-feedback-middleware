@@ -1,17 +1,12 @@
 import { z } from "zod";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Buffer } from "node:buffer";
-import type { FeedbackPort } from "@llm-feedback-middleware/core";
+import type { CapturePort } from "@ai-feedback-middleware/core";
 
 const WebhookPayloadSchema = z.object({
-  action: z.string(),
-  artifact_type: z.string(),
   artifact_id: z.string(),
-  artifact_version: z.number().int().nonnegative(),
-  producer: z.string(),
-  task_type: z.string(),
+  action: z.string(),
   payload: z.unknown().optional(),
-  partition_key: z.string().optional(),
   source_system: z.string().optional(),
 });
 
@@ -25,17 +20,23 @@ export interface WebhookCaptureOptions {
 }
 
 /**
- * Webhook capture adapter. Designed for receiving feedback events from
+ * Webhook capture adapter. Designed for receiving reaction events from
  * external systems (e.g., a SaaS product fires a webhook when a user clicks
  * "this answer was helpful"). Verifies HMAC signature, parses the body,
- * captures via the feedback port.
+ * records the reaction via the feedback port.
+ *
+ * v2.1: a webhook delivers a *reaction* to an artifact whose lifecycle was
+ * already opened by the consumer's own `captureArtifact()` call. The
+ * webhook payload only needs `artifact_id` + `action`; the artifact
+ * metadata (artifact_type, producer, task_type, etc.) is resolved by the
+ * framework from the existing `tracked_artifacts` row.
  *
  * NOTE: provide your own `verify` function in production. The default uses
- * `node:crypto` timingSafeEqual but the verification semantics (header name,
- * encoding) vary per source system.
+ * `node:crypto` timingSafeEqual but the verification semantics (header
+ * name, encoding) vary per source system.
  */
 export function createWebhookCaptureAdapter(
-  feedback: FeedbackPort,
+  feedback: CapturePort,
   options: WebhookCaptureOptions,
 ): {
   handle: (rawBody: string, signature: string) => Promise<{ event_id: string }>;
@@ -49,22 +50,17 @@ export function createWebhookCaptureAdapter(
         throw new Error("Invalid webhook signature");
       }
       const parsed = WebhookPayloadSchema.parse(JSON.parse(rawBody));
-      const event_id = await feedback.capture({
-        action: parsed.action,
-        artifact_type: parsed.artifact_type,
+      const result = await feedback.recordReaction({
         artifact_id: parsed.artifact_id,
-        artifact_version: parsed.artifact_version,
-        producer: parsed.producer,
-        task_type: parsed.task_type,
-        payload: parsed.payload ?? {},
+        action: parsed.action,
+        payload: parsed.payload,
         provenance: {
           channel,
           captured_by_adapter: "webhook",
           ...(parsed.source_system !== undefined && { instance_id: parsed.source_system }),
         },
-        ...(parsed.partition_key !== undefined && { partition_key: parsed.partition_key }),
       });
-      return { event_id };
+      return { event_id: result.event_id };
     },
   };
 }

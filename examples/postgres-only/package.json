@@ -2,7 +2,7 @@
   "name": "postgres-only",
   "version": "0.0.0",
   "private": true,
-  "description": "Example consumer using @llm-feedback-middleware with Postgres event store and projection store.",
+  "description": "Example consumer using @ai-feedback-middleware with Postgres event store and projection store.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -10,8 +10,8 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*",
-    "@llm-feedback-middleware/postgres": "workspace:*",
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/postgres": "workspace:*",
     "pg": "^8.13.1"
   },
   "devDependencies": {

@@ -1,17 +1,17 @@
 {
-  "name": "@llm-feedback-middleware/core",
-  "version": "0.0.0",
-  "description": "Core types, classifier, registry, and ports for the llm-feedback-middleware framework.",
+  "name": "@ai-feedback-middleware/core",
+  "version": "0.3.0-alpha.0",
+  "description": "Core types, classifier, registry, and ports for the ai-feedback-middleware framework.",
   "license": "Apache-2.0",
   "author": "Babak Abbaschian",
-  "homepage": "https://github.com/baabakk/llm-feedback-middleware",
+  "homepage": "https://github.com/baabakk/ai-feedback-middleware",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
+    "url": "git+https://github.com/baabakk/ai-feedback-middleware.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
+    "url": "https://github.com/baabakk/ai-feedback-middleware/issues"
   },
   "keywords": [
     "feedback",

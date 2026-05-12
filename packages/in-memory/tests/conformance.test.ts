@@ -4,14 +4,18 @@ import {
   runEventBusConformance,
   runDedupeStoreConformance,
   runOutboxConformance,
-  runInferenceRulesConformance,
-} from "@llm-feedback-middleware/adapter-conformance";
+  runActionabilityRulesConformance,
+  runTrackedArtifactsConformance,
+  runActionabilityDecisionsConformance,
+} from "@ai-feedback-middleware/adapter-conformance";
 import { createInMemoryEventStore } from "../src/event-store.js";
 import { createInMemoryProjectionStore } from "../src/projection-store.js";
 import { createInMemoryEventBus } from "../src/event-bus.js";
 import { createInMemoryDedupeStore } from "../src/dedupe-store.js";
 import { createInMemoryOutbox } from "../src/outbox.js";
-import { createInMemoryInferenceRulesStore } from "../src/inference-rules.js";
+import { createInMemoryActionabilityRulesStore } from "../src/actionability-rules.js";
+import { createInMemoryTrackedArtifactsStore } from "../src/tracked-artifacts.js";
+import { createInMemoryActionabilityDecisionsStore } from "../src/actionability-decisions.js";
 
 runEventStoreConformance({
   name: "InMemoryEventStore",
@@ -38,7 +42,17 @@ runOutboxConformance({
   factory: () => createInMemoryOutbox(),
 });
 
-runInferenceRulesConformance({
-  name: "InMemoryInferenceRulesStore",
-  factory: () => createInMemoryInferenceRulesStore(),
+runActionabilityRulesConformance({
+  name: "InMemoryActionabilityRulesStore",
+  factory: () => createInMemoryActionabilityRulesStore(),
+});
+
+runTrackedArtifactsConformance({
+  name: "InMemoryTrackedArtifactsStore",
+  factory: () => createInMemoryTrackedArtifactsStore(),
+});
+
+runActionabilityDecisionsConformance({
+  name: "InMemoryActionabilityDecisionsStore",
+  factory: () => createInMemoryActionabilityDecisionsStore(),
 });

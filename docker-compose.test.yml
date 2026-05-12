@@ -1,0 +1,41 @@
+# Throwaway infra for adapter conformance tests.
+#
+# Boots ephemeral Postgres + Redis on isolated ports so the suite never
+# collides with anything else running on the host. tmpfs storage means the
+# stack starts cold in ~5s and leaves no disk footprint.
+#
+# Used by `pnpm test:integration` (see package.json + scripts/test-integration.mjs).
+# Run manually:
+#   docker compose -f docker-compose.test.yml -p lfm-test up -d
+#   FEEDBACK_TEST_DATABASE_URL=postgres://feedback:feedback@127.0.0.1:55432/feedback_test \
+#   REDIS_URL=redis://127.0.0.1:56379 \
+#     pnpm -r test
+#   docker compose -f docker-compose.test.yml -p lfm-test down -v
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: feedback
+      POSTGRES_PASSWORD: feedback
+      POSTGRES_DB: feedback_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data:rw,size=512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feedback -d feedback_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  redis-test:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 30

@@ -1,6 +1,6 @@
 # minimal-nodejs
 
-The smallest possible consumer of `@llm-feedback-middleware/*`.
+The smallest possible consumer of `@ai-feedback-middleware/*`.
 
 ## Run
 

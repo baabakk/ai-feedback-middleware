@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { ProjectionStorePort } from "@llm-feedback-middleware/core";
+import type { ProjectionStorePort } from "@ai-feedback-middleware/core";
 
 export interface ProjectionStoreConformanceOptions {
   name: string;

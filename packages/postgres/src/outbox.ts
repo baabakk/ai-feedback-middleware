@@ -4,7 +4,7 @@ import type {
   OutboxRow,
   FeedbackEvent,
   Transaction,
-} from "@llm-feedback-middleware/core";
+} from "@ai-feedback-middleware/core";
 
 export interface PostgresOutboxOptions {
   pool: Pool;
@@ -14,6 +14,7 @@ export interface PostgresOutboxOptions {
 
 interface DbRow {
   event_id: string;
+  artifact_id: string;
   topics: string[];
   event: FeedbackEvent;
   enqueued_at: Date;
@@ -30,17 +31,22 @@ export function createPostgresOutbox(options: PostgresOutboxOptions): OutboxPort
   }
 
   return {
-    async enqueue(event: FeedbackEvent, topics: string[], tx?: Transaction): Promise<void> {
+    async enqueue(
+      event: FeedbackEvent,
+      topics: string[],
+      artifact_id: string,
+      tx?: Transaction,
+    ): Promise<void> {
       await executor(tx).query(
-        `INSERT INTO ${table} (event_id, topics, event)
-         VALUES ($1, $2, $3::jsonb)`,
-        [event.event_id, topics, JSON.stringify(event)],
+        `INSERT INTO ${table} (event_id, artifact_id, topics, event)
+         VALUES ($1, $2, $3, $4::jsonb)`,
+        [event.event_id, artifact_id, topics, JSON.stringify(event)],
       );
     },
 
     async pickUnpublished(limit: number): Promise<OutboxRow[]> {
       const result = await pool.query<DbRow>(
-        `SELECT event_id, topics, event, enqueued_at, attempt_count, last_error
+        `SELECT event_id, artifact_id, topics, event, enqueued_at, attempt_count, last_error
          FROM ${table}
          WHERE published_at IS NULL AND next_attempt_at <= NOW()
          ORDER BY enqueued_at ASC
@@ -49,6 +55,7 @@ export function createPostgresOutbox(options: PostgresOutboxOptions): OutboxPort
       );
       return result.rows.map((r) => ({
         event_id: r.event_id,
+        artifact_id: r.artifact_id,
         topics: r.topics,
         enqueued_at: r.enqueued_at.toISOString(),
         attempt_count: r.attempt_count,

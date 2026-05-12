@@ -1,14 +1,17 @@
 /**
- * Full-stack example: Postgres event store + projection store + outbox,
- * Redis pub/sub bus, middleware pipeline, transactional outbox scanner.
+ * Full-stack example: Postgres event store + projection store + outbox +
+ * tracked artifacts + actionability decisions, Redis pub/sub bus,
+ * middleware pipeline, transactional outbox scanner (v2.1).
  *
  * Demonstrates:
  * - Composing all framework layers
- * - Sync projection (writing samples) updated in capture transaction
- * - Async subscriber (quality metrics) reading from the bus
+ * - captureArtifact + recordReaction lifecycle
+ * - Sync projection updated in capture transaction
+ * - Async subscriber reading from the bus
  * - Outbox scanner draining outbox to bus with retry
  * - Middleware (logging, retry) wrapping bus publishes
- * - Inference rule: 3 regenerates on same task in 1 minute -> blacklist
+ * - Actionability rule: 3 regenerated events on same task in 1 minute
+ *   crystallize as `actionable_negative` on the content axis.
  *
  * Run:
  *   DATABASE_URL=postgres://user:pass@host:5432/feedback \
@@ -19,21 +22,25 @@ import pg from "pg";
 import {
   createFeedback,
   DEFAULT_ACTIONS,
+  rejectByDefault,
   topicsFor,
   loggingMiddleware,
   retryMiddleware,
-  type ProjectionBuilder,
+  type CapturedEvaluatedReactionEvent,
   type FeedbackEvent,
-} from "@llm-feedback-middleware/core";
+  type ProjectionBuilder,
+} from "@ai-feedback-middleware/core";
 import {
   createPostgresEventStore,
   createPostgresProjectionStore,
   createPostgresOutbox,
-  createPostgresInferenceRulesStore,
+  createPostgresActionabilityRulesStore,
+  createPostgresTrackedArtifactsStore,
+  createPostgresActionabilityDecisionsStore,
   startOutboxScanner,
   runMigrations,
-} from "@llm-feedback-middleware/postgres";
-import { createRedisPubSubEventBus } from "@llm-feedback-middleware/redis-pubsub";
+} from "@ai-feedback-middleware/postgres";
+import { createRedisPubSubEventBus } from "@ai-feedback-middleware/redis-pubsub";
 
 const { Pool } = pg;
 
@@ -42,7 +49,8 @@ type Counter = { count: number };
 const writingSamples: ProjectionBuilder<Counter> = {
   name: "writing_samples",
   mode: "sync",
-  applies: (e) => e.action === "approve" && e.artifact_type === "draft",
+  applies: (e) =>
+    e.event_kind === "reaction" && e.action === "approved" && e.artifact_type === "draft_email",
   apply: (_e, current) => ({ count: (current?.count ?? 0) + 1 }),
 };
 
@@ -64,14 +72,17 @@ async function main(): Promise<void> {
     const m = await runMigrations(pool);
     console.log(`Applied: ${m.applied.join(", ")}`);
 
-    // Seed an inference rule: 3 regenerates within 1 minute -> blacklist
-    const rules = createPostgresInferenceRulesStore({ pool });
+    // Seed an actionability rule: 3 regenerated reactions within 1 minute on
+    // the content axis -> actionable_negative.
+    const rules = createPostgresActionabilityRulesStore({ pool });
     await rules.upsert({
-      rule_id: "demo_regenerate_to_blacklist",
-      applies_when: { action: "regenerate" },
+      rule_id: "demo_regenerated_to_content_actionable_negative",
+      rule_version: "1",
+      applies_when: { action: "regenerated" },
+      axis: "content",
       threshold: 3,
       window_ms: 60_000,
-      result_if_met: "blacklist",
+      result_if_met: "actionable_negative",
       active: true,
       notes: "Demo rule for postgres-redis example",
     });
@@ -80,15 +91,19 @@ async function main(): Promise<void> {
     const eventStore = createPostgresEventStore({ pool });
     const projectionStore = createPostgresProjectionStore({ pool });
     const outbox = createPostgresOutbox({ pool });
+    const trackedArtifacts = createPostgresTrackedArtifactsStore({ pool });
+    const actionabilityDecisions = createPostgresActionabilityDecisionsStore({ pool });
 
     const feedback = createFeedback({
       eventStore,
       projectionStore,
+      trackedArtifacts,
       eventBus,
       outbox,
-      inferenceRules: rules,
+      actionabilityRules: rules,
+      actionabilityDecisions,
       actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
+      artifactTypes: [rejectByDefault("draft_email")],
       projections: [writingSamples],
       publishMiddleware: [
         loggingMiddleware({ pipelineName: "publish" }),
@@ -96,14 +111,17 @@ async function main(): Promise<void> {
       ],
     });
 
-    // Async subscriber: counts events by inference (mock quality metrics).
-    const inferenceCounts = new Map<string, number>();
-    unsubMetrics = eventBus.subscribe("feedback.inference.>", async (event: FeedbackEvent) => {
-      const key = event.inference;
-      inferenceCounts.set(key, (inferenceCounts.get(key) ?? 0) + 1);
-    });
+    // Async subscriber: counts events by source (mock quality metrics).
+    const sourceCounts = new Map<string, number>();
+    unsubMetrics = await eventBus.subscribe(
+      "feedback.reaction.>",
+      async (event: FeedbackEvent) => {
+        if (event.event_kind !== "reaction") return;
+        const key = event.source;
+        sourceCounts.set(key, (sourceCounts.get(key) ?? 0) + 1);
+      },
+    );
 
-    // Outbox scanner -- drains outbox to bus every 1s in this demo
     stopScanner = startOutboxScanner({
       outbox,
       eventBus,
@@ -113,39 +131,49 @@ async function main(): Promise<void> {
       },
     });
 
-    console.log("\n--- Capturing 5 events ---");
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    console.log("\n--- Capturing 5 lifecycles ---");
+    const cap1 = await feedback.captureArtifact({
+      artifact_type: "draft_email",
       artifact_id: "art-1",
       artifact_version: 1,
       producer: "demo-agent",
       task_type: "draft:email",
       payload: {},
+      expires_at: future,
     });
-    // Trigger the rule: 3 regenerates on the same partition.
+    await feedback.recordReaction({ artifact_id: cap1.artifact_id, action: "approved" });
+
+    // Trigger the rule: 3 regenerated reactions on the same artifact.
+    const cap2 = await feedback.captureArtifact({
+      artifact_type: "draft_email",
+      artifact_id: "art-2",
+      artifact_version: 1,
+      producer: "demo-agent",
+      task_type: "draft:email",
+      payload: {},
+      expires_at: future,
+    });
     for (let i = 0; i < 3; i++) {
-      await feedback.capture({
-        action: "regenerate",
-        artifact_type: "draft",
-        artifact_id: "art-2",
-        artifact_version: i + 1,
-        producer: "demo-agent",
-        task_type: "draft:email",
-        payload: {},
-      });
+      await feedback.recordReaction({ artifact_id: cap2.artifact_id, action: "regenerated" });
     }
-    await feedback.capture({
-      action: "edit",
-      artifact_type: "draft",
+
+    const cap3 = await feedback.captureArtifact({
+      artifact_type: "draft_email",
       artifact_id: "art-3",
       artifact_version: 1,
       producer: "demo-agent",
       task_type: "draft:email",
+      payload: {},
+      expires_at: future,
+    });
+    await feedback.recordReaction({
+      artifact_id: cap3.artifact_id,
+      action: "manually_edited",
       payload: { original: "long formal text", corrected: "Hi" },
     });
 
-    // Wait for outbox scanner + bus delivery
     console.log("\n--- Waiting 1.5s for outbox + bus delivery ---");
     await new Promise((r) => setTimeout(r, 1500));
 
@@ -153,28 +181,32 @@ async function main(): Promise<void> {
     console.log(`Backlog: ${await outbox.backlogSize()}`);
     console.log(`Oldest unpublished age: ${await outbox.oldestUnpublishedAgeMs()} ms`);
 
-    console.log("\n--- Inference distribution (from async subscriber) ---");
-    for (const [k, v] of inferenceCounts) {
+    console.log("\n--- Reaction-source distribution (from async subscriber) ---");
+    for (const [k, v] of sourceCounts) {
       console.log(`  ${k}: ${v}`);
     }
 
-    console.log("\n--- Reading partition stream for art-2 (the regenerate target) ---");
-    const events: FeedbackEvent[] = [];
-    for await (const e of feedback.readStream("art-2")) events.push(e);
-    for (const e of events) {
+    console.log("\n--- Actionability decisions for art-2 ---");
+    let decisionCount = 0;
+    for await (const d of feedback.readActionableDecisions({ axis: "content" })) {
+      if (d.artifact_id !== "art-2") continue;
+      decisionCount += 1;
       console.log(
-        `  ${e.event_id} | ${e.action} | polarity=${e.polarity} | inference=${e.inference}`,
+        `  decision_id=${d.decision_id} axis=${d.axis} inference=${d.inference} evidence=${d.evidence_event_ids.length} reactions`,
       );
     }
-    // The 3rd regenerate should hit the threshold and be classified as blacklist.
-    const blacklisted = events.filter((e) => e.inference === "blacklist");
-    console.log(
-      `\n  ${blacklisted.length} of ${events.length} regenerate events crossed the threshold`,
-    );
+    console.log(`Total content-axis decisions on art-2: ${decisionCount}`);
 
-    console.log("\n--- Topics published for the latest event ---");
-    if (events.length > 0) {
-      for (const t of topicsFor(events[events.length - 1]!)) {
+    console.log("\n--- Reading reaction stream for art-2 ---");
+    const reactions: CapturedEvaluatedReactionEvent[] = [];
+    for await (const r of feedback.readReactions({ partition_key: "art-2" })) reactions.push(r);
+    for (const r of reactions) {
+      console.log(`  ${r.event_id} | action=${r.action} | content=${r.evaluations.content ?? "—"}`);
+    }
+
+    console.log("\n--- Topics for the latest event ---");
+    if (reactions.length > 0) {
+      for (const t of topicsFor(reactions[reactions.length - 1]!)) {
         console.log(`  ${t}`);
       }
     }

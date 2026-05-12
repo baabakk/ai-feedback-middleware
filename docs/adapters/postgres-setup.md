@@ -1,6 +1,6 @@
 # Postgres setup
 
-The `@llm-feedback-middleware/postgres` package implements
+The `@ai-feedback-middleware/postgres` package implements
 `EventStorePort`, `ProjectionStorePort`, `OutboxPort`, `DedupeStorePort`,
 and `InferenceRulesPort` against a Postgres database. It is the
 production-default storage adapter for most consumers.
@@ -16,7 +16,7 @@ production-default storage adapter for most consumers.
 ## Install
 
 ```bash
-pnpm add @llm-feedback-middleware/postgres pg
+pnpm add @ai-feedback-middleware/postgres pg
 ```
 
 ## Run migrations
@@ -25,7 +25,7 @@ The package ships migrations and a one-call runner:
 
 ```typescript
 import pg from "pg";
-import { runMigrations } from "@llm-feedback-middleware/postgres";
+import { runMigrations } from "@ai-feedback-middleware/postgres";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const result = await runMigrations(pool);
@@ -45,8 +45,8 @@ import {
   createPostgresOutbox,
   createPostgresInferenceRulesStore,
   createPostgresDedupeStore,
-} from "@llm-feedback-middleware/postgres";
-import { createFeedback, DEFAULT_ACTIONS } from "@llm-feedback-middleware/core";
+} from "@ai-feedback-middleware/postgres";
+import { createFeedback, DEFAULT_ACTIONS } from "@ai-feedback-middleware/core";
 
 const feedback = createFeedback({
   eventStore: createPostgresEventStore({ pool }),
@@ -90,7 +90,7 @@ add a partial index for the predicate that matters most.
 The outbox scanner runs separately from the framework wiring:
 
 ```typescript
-import { startOutboxScanner } from "@llm-feedback-middleware/postgres";
+import { startOutboxScanner } from "@ai-feedback-middleware/postgres";
 
 const stop = startOutboxScanner({
   outbox: createPostgresOutbox({ pool }),

@@ -17,13 +17,14 @@ export function correlationIdMiddleware(
     if (existing) {
       return next(event);
     }
-    const enriched: FeedbackEvent = {
-      ...event,
-      provenance: {
-        ...event.provenance,
-        correlation_id: generate(),
-      } as FeedbackEvent["provenance"],
-    };
+    const provenance = {
+      ...event.provenance,
+      correlation_id: generate(),
+    } as FeedbackEvent["provenance"];
+    const enriched: FeedbackEvent =
+      event.event_kind === "capture"
+        ? { ...event, provenance }
+        : { ...event, provenance };
     return next(enriched);
   };
 }

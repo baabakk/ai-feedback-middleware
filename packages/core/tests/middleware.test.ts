@@ -13,22 +13,25 @@ import {
   type FeedbackEvent,
 } from "../src/index.js";
 
-function makeEvent(overrides: Partial<FeedbackEvent> = {}): FeedbackEvent {
+type ReactionEvent = Extract<FeedbackEvent, { event_kind: "reaction" }>;
+
+function makeEvent(overrides: Partial<ReactionEvent> = {}): FeedbackEvent {
   return {
+    event_kind: "reaction",
     event_id: "e1",
-    event_version: 1,
-    timestamp: "2026-04-24T00:00:00Z",
-    captured_at: "2026-04-24T00:00:00Z",
-    partition_key: "p-1",
-    source: "explicit",
-    polarity: "positive",
-    inference: "whitelist",
-    action: "approve",
-    artifact_type: "draft",
+    event_version: 2,
     artifact_id: "p-1",
+    artifact_type: "draft_email",
     artifact_version: 1,
+    partition_key: "p-1",
     producer: "test",
     task_type: "test_task",
+    source: "explicit",
+    action: "approved",
+    evaluations: { detection: "positive", content: "positive", timing: "positive", channel: "positive" },
+    classifier_version: "test-2.1",
+    occurred_at: "2026-04-24T00:00:00Z",
+    captured_at: "2026-04-24T00:00:00Z",
     payload: {},
     provenance: { channel: "test", captured_by_adapter: "test" },
     ...overrides,
@@ -220,12 +223,12 @@ describe("metricsMiddleware", () => {
     };
   }
 
-  it("emits success counter with action+inference labels on success", async () => {
+  it("emits success counter with event_kind+action labels on success (reaction event)", async () => {
     const metrics = makeMetrics();
     const handler = metricsMiddleware(metrics)(async () => {});
-    await handler(makeEvent({ action: "approve", inference: "whitelist" }));
+    await handler(makeEvent({ action: "approved" }));
     expect(metrics.counters.find((c) => c.name === "feedback.pipeline.success")).toBeTruthy();
-    expect(metrics.counters[0]!.labels).toEqual({ action: "approve", inference: "whitelist" });
+    expect(metrics.counters[0]!.labels).toEqual({ event_kind: "reaction", action: "approved" });
   });
 
   it("emits error counter with error class label on failure", async () => {

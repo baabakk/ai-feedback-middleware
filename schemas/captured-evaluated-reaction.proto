@@ -1,0 +1,71 @@
+// Canonical proto3 definition for CapturedEvaluatedReactionEvent (v2.1).
+// Per-axis polarity is computed by Layer 3 (Reaction Evaluation) at write
+// time and embedded inline as separate optional fields.
+//
+// Source of truth: packages/core/src/event-types.ts (Zod schema).
+
+syntax = "proto3";
+
+package llm_feedback_middleware.v2;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  SOURCE_EXPLICIT = 1;
+  SOURCE_IMPLICIT = 2;
+  SOURCE_META = 3;
+}
+
+enum AxisPolarity {
+  AXIS_POLARITY_UNSPECIFIED = 0;
+  AXIS_POLARITY_POSITIVE = 1;
+  AXIS_POLARITY_NEGATIVE = 2;
+}
+
+message EvaluationVector {
+  // Each axis is OPTIONAL. Absence means "no signal on this axis".
+  optional AxisPolarity detection = 1;
+  optional AxisPolarity content = 2;
+  optional AxisPolarity timing = 3;
+  optional AxisPolarity channel = 4;
+}
+
+message Provenance {
+  string channel = 1;
+  optional string instance_id = 2;
+  optional double latency_ms = 3;
+  string captured_by_adapter = 4;
+}
+
+message CapturedEvaluatedReactionEvent {
+  // Discriminator. Always "reaction" for this message.
+  string event_kind = 1;
+
+  string event_id = 2;
+  uint32 event_version = 3;
+
+  string artifact_id = 4;
+  string artifact_type = 5;
+  uint32 artifact_version = 6;
+  string partition_key = 7;
+  string producer = 8;
+  string task_type = 9;
+
+  Source source = 10;
+  string action = 11;
+
+  EvaluationVector evaluations = 12;
+  string classifier_version = 13;
+
+  google.protobuf.Timestamp occurred_at = 14;
+  google.protobuf.Timestamp captured_at = 15;
+
+  google.protobuf.Struct payload = 16;
+  Provenance provenance = 17;
+
+  // Tombstone fields. Only set on `corrected` / `superseded_by` reactions.
+  optional string correction_of_event_id = 18;
+  optional string successor_artifact_id = 19;
+}

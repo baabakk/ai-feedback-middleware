@@ -18,12 +18,12 @@ issue trackers signal a vulnerability to attackers before consumers can patch.
 Instead, report privately through one of the channels below:
 
 1. **GitHub Security Advisories (preferred).** Open a private advisory at
-   `https://github.com/baabakk/llm-feedback-middleware/security/advisories/new`.
+   `https://github.com/baabakk/ai-feedback-middleware/security/advisories/new`.
    GitHub notifies the maintainers and gives us a private workspace to
    coordinate the fix and CVE assignment.
 2. **Email.** Send the report to the address listed in the project's
    `package.json` `author` field. Use the subject line
-   `[security] llm-feedback-middleware: <one-line summary>`.
+   `[security] ai-feedback-middleware: <one-line summary>`.
 
 Please include:
 

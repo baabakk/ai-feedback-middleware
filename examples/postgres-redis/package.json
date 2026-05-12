@@ -10,9 +10,9 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*",
-    "@llm-feedback-middleware/postgres": "workspace:*",
-    "@llm-feedback-middleware/redis-pubsub": "workspace:*",
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/postgres": "workspace:*",
+    "@ai-feedback-middleware/redis-pubsub": "workspace:*",
     "ioredis": "^5.4.2",
     "pg": "^8.13.1"
   },

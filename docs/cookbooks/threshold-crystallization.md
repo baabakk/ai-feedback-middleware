@@ -18,7 +18,7 @@ retrieval, anti-pattern detection) treat it as a negative example.
 The framework's `InferenceRulesPort` lets you declare this:
 
 ```typescript
-import { createPostgresInferenceRulesStore } from "@llm-feedback-middleware/postgres";
+import { createPostgresInferenceRulesStore } from "@ai-feedback-middleware/postgres";
 
 const rules = createPostgresInferenceRulesStore({ pool });
 
@@ -61,7 +61,7 @@ The same pattern via the streams package, for consumers who want
 operator-level control:
 
 ```typescript
-import { toEventStream } from "@llm-feedback-middleware/streams";
+import { toEventStream } from "@ai-feedback-middleware/streams";
 import { filter, groupBy, mergeMap, bufferCount, tap } from "rxjs/operators";
 
 const stream$ = toEventStream(eventBus, "feedback.action.regenerate");
@@ -113,7 +113,7 @@ that crosses the threshold gets promoted, and prints the result.
 
 - **Approve-rate threshold.** Promote a (producer, task_type) to
   `whitelist` once approval rate > 80% over 100 events. Use the
-  `approvalRateProjection` from `@llm-feedback-middleware/reference`.
+  `approvalRateProjection` from `@ai-feedback-middleware/reference`.
 - **Anti-pattern detection.** Scan recent `blacklist` events for shared
   payload features (common phrases removed by edits) and synthesize a
   "do not do this" instruction for the next prompt.

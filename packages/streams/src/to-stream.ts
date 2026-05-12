@@ -1,5 +1,10 @@
 import { Observable } from "rxjs";
-import type { EventBusPort, FeedbackEvent, SubscribeOptions } from "@llm-feedback-middleware/core";
+import type {
+  EventBusPort,
+  FeedbackEvent,
+  SubscribeOptions,
+  Unsubscribe,
+} from "@ai-feedback-middleware/core";
 
 /**
  * Wrap a topic subscription on an EventBusPort as an RxJS Observable.
@@ -9,7 +14,8 @@ import type { EventBusPort, FeedbackEvent, SubscribeOptions } from "@llm-feedbac
  * Subscribers that don't never import this package and never pull in RxJS.
  *
  * The Observable's teardown invokes the bus's unsubscribe so cleanup is
- * automatic.
+ * automatic. The Observable handles the async subscribe() round-trip
+ * internally — emitted values arrive once the broker confirms registration.
  */
 export function toStream(
   bus: EventBusPort,
@@ -17,16 +23,27 @@ export function toStream(
   options?: SubscribeOptions,
 ): Observable<{ event: FeedbackEvent; topic: string }> {
   return new Observable<{ event: FeedbackEvent; topic: string }>((subscriber) => {
-    const unsubscribe = bus.subscribe(
-      topic,
-      async (event, deliveredTopic) => {
-        subscriber.next({ event, topic: deliveredTopic });
-      },
-      options,
-    );
+    let unsub: Unsubscribe | null = null;
+    let cancelled = false;
+    void bus
+      .subscribe(
+        topic,
+        async (event, deliveredTopic) => {
+          subscriber.next({ event, topic: deliveredTopic });
+        },
+        options,
+      )
+      .then((u) => {
+        if (cancelled) {
+          void u();
+          return;
+        }
+        unsub = u;
+      })
+      .catch((err) => subscriber.error(err));
     return () => {
-      // Best-effort teardown; await is not allowed here.
-      void unsubscribe();
+      cancelled = true;
+      if (unsub) void unsub();
     };
   });
 }
@@ -41,15 +58,27 @@ export function toEventStream(
   options?: SubscribeOptions,
 ): Observable<FeedbackEvent> {
   return new Observable<FeedbackEvent>((subscriber) => {
-    const unsubscribe = bus.subscribe(
-      topic,
-      async (event) => {
-        subscriber.next(event);
-      },
-      options,
-    );
+    let unsub: Unsubscribe | null = null;
+    let cancelled = false;
+    void bus
+      .subscribe(
+        topic,
+        async (event) => {
+          subscriber.next(event);
+        },
+        options,
+      )
+      .then((u) => {
+        if (cancelled) {
+          void u();
+          return;
+        }
+        unsub = u;
+      })
+      .catch((err) => subscriber.error(err));
     return () => {
-      void unsubscribe();
+      cancelled = true;
+      if (unsub) void unsub();
     };
   });
 }

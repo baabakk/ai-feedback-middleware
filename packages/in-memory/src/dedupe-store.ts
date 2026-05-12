@@ -1,4 +1,4 @@
-import type { DedupeStorePort } from "@llm-feedback-middleware/core";
+import type { DedupeStorePort } from "@ai-feedback-middleware/core";
 
 /**
  * In-memory dedupe store with TTL-based expiry. Keys auto-expire when

@@ -6,7 +6,9 @@ import type { Middleware } from "./types.js";
  * Emit success/error counters and latency timing for the wrapped handler.
  *
  * Counter naming: `<prefix>.success`, `<prefix>.error`. Timing: `<prefix>.duration_ms`.
- * Standard label set: `action`, `inference`. Custom labels can be merged via options.
+ *
+ * Standard label set: `event_kind`, plus `action` (for reaction events only).
+ * Custom labels can be merged via options.
  */
 export function metricsMiddleware(
   metrics: MetricsPort,
@@ -19,7 +21,11 @@ export function metricsMiddleware(
   const counter = options.counterPrefix ?? "feedback.pipeline";
   const timingName = options.timingName ?? `${counter}.duration_ms`;
   const labelsFor =
-    options.labels ?? ((e: FeedbackEvent) => ({ action: e.action, inference: e.inference }));
+    options.labels ??
+    ((e: FeedbackEvent): Record<string, string> =>
+      e.event_kind === "reaction"
+        ? { event_kind: "reaction", action: e.action }
+        : { event_kind: "capture" });
 
   return (next) => async (event) => {
     const labels = labelsFor(event);

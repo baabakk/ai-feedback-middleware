@@ -1,56 +1,66 @@
 import { describe, it, expect } from "vitest";
-import { createFeedback, DEFAULT_ACTIONS } from "@llm-feedback-middleware/core";
+import {
+  createFeedback,
+  DEFAULT_ACTIONS,
+  rejectByDefault,
+  type CapturePort,
+  type ProjectionBuilder,
+} from "@ai-feedback-middleware/core";
 import {
   createInMemoryEventStore,
   createInMemoryProjectionStore,
-} from "@llm-feedback-middleware/in-memory";
+  createInMemoryTrackedArtifactsStore,
+} from "@ai-feedback-middleware/in-memory";
 import {
   approvalRateProjection,
-  createWhitelistExamplesProjection,
-  createBlacklistPhrasesProjection,
+  createApprovedExamplesProjection,
+  createRemovedPhrasesProjection,
   type ApprovalRateState,
-  type WhitelistExamplesState,
-  type BlacklistPhrasesState,
+  type ApprovedExamplesState,
+  type RemovedPhrasesState,
 } from "../src/index.js";
 
-describe("approvalRateProjection", () => {
-  it("computes approval rate correctly across approves and rejects", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [approvalRateProjection],
-    });
+const FUTURE = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    // Two approves, one reject -> 2/3 ≈ 0.666
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
-      payload: {},
-    });
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
-      artifact_id: "a-2",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
-      payload: {},
-    });
-    await feedback.capture({
-      action: "reject",
-      artifact_type: "draft",
-      artifact_id: "a-3",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
-      payload: {},
-    });
+function makeFeedback(projections: ProjectionBuilder<unknown>[]): CapturePort {
+  return createFeedback({
+    eventStore: createInMemoryEventStore(),
+    projectionStore: createInMemoryProjectionStore(),
+    trackedArtifacts: createInMemoryTrackedArtifactsStore(),
+    actions: DEFAULT_ACTIONS,
+    artifactTypes: [rejectByDefault("draft_email")],
+    projections,
+  });
+}
+
+async function captureAndReact(
+  feedback: CapturePort,
+  artifact_id: string,
+  action: string,
+  options: { producer?: string; task_type?: string; payload?: unknown } = {},
+): Promise<void> {
+  const cap = await feedback.captureArtifact({
+    artifact_type: "draft_email",
+    artifact_id,
+    artifact_version: 1,
+    producer: options.producer ?? "agent",
+    task_type: options.task_type ?? "draft:email",
+    payload: {},
+    expires_at: FUTURE,
+  });
+  await feedback.recordReaction({
+    artifact_id: cap.artifact_id,
+    action,
+    payload: options.payload,
+  });
+}
+
+describe("approvalRateProjection", () => {
+  it("computes approval rate across approved and rejected reactions", async () => {
+    const feedback = makeFeedback([approvalRateProjection]);
+    await captureAndReact(feedback, "a-1", "approved");
+    await captureAndReact(feedback, "a-2", "approved");
+    await captureAndReact(feedback, "a-3", "rejected");
 
     const states = await feedback.queryProjection<ApprovalRateState>("approval_rate", undefined);
     expect(states.length).toBe(1);
@@ -61,32 +71,9 @@ describe("approvalRateProjection", () => {
   });
 
   it("isolates state per (producer, task_type)", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [approvalRateProjection],
-    });
-
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent-A",
-      task_type: "task-X",
-      payload: {},
-    });
-    await feedback.capture({
-      action: "reject",
-      artifact_type: "draft",
-      artifact_id: "a-2",
-      artifact_version: 1,
-      producer: "agent-B",
-      task_type: "task-Y",
-      payload: {},
-    });
+    const feedback = makeFeedback([approvalRateProjection]);
+    await captureAndReact(feedback, "a-1", "approved", { producer: "agent-A", task_type: "task-X" });
+    await captureAndReact(feedback, "a-2", "rejected", { producer: "agent-B", task_type: "task-Y" });
 
     const states = await feedback.queryProjection<ApprovalRateState>("approval_rate", undefined);
     expect(states.length).toBe(2);
@@ -95,182 +82,93 @@ describe("approvalRateProjection", () => {
   });
 });
 
-describe("createWhitelistExamplesProjection", () => {
-  it("collects whitelist events into a per-key library", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createWhitelistExamplesProjection()],
+describe("createApprovedExamplesProjection", () => {
+  it("collects approved reactions into a per-key library", async () => {
+    const feedback = makeFeedback([createApprovedExamplesProjection({ capPerKey: 3 })]);
+    await captureAndReact(feedback, "a-1", "approved", {
+      payload: { artifact_hash: "sha256:1" },
     });
+    await captureAndReact(feedback, "a-2", "approved", {
+      payload: { artifact_hash: "sha256:2" },
+    });
+    // Reject should NOT be added.
+    await captureAndReact(feedback, "a-3", "rejected");
 
-    for (let i = 0; i < 3; i++) {
-      await feedback.capture({
-        action: "approve",
-        artifact_type: "draft",
-        artifact_id: `a-${i}`,
-        artifact_version: 1,
-        producer: "agent",
-        task_type: "draft:email",
-        payload: { artifact_hash: `sha256:${i}` },
-      });
-    }
-
-    const states = await feedback.queryProjection<WhitelistExamplesState>(
-      "whitelist_examples",
+    const states = await feedback.queryProjection<ApprovedExamplesState>(
+      "approved_examples",
       undefined,
     );
     expect(states.length).toBe(1);
-    expect(states[0]!.examples.length).toBe(3);
-    expect(states[0]!.examples.map((e) => e.artifact_id)).toEqual(["a-0", "a-1", "a-2"]);
+    expect(states[0]!.examples).toHaveLength(2);
+    expect(states[0]!.examples[0]!.artifact_id).toBe("a-1");
+    expect(states[0]!.examples[1]!.artifact_id).toBe("a-2");
   });
 
-  it("respects capPerKey by evicting oldest", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createWhitelistExamplesProjection({ capPerKey: 2 })],
-    });
-
-    for (let i = 0; i < 5; i++) {
-      await feedback.capture({
-        action: "approve",
-        artifact_type: "draft",
-        artifact_id: `a-${i}`,
-        artifact_version: 1,
-        producer: "agent",
-        task_type: "draft:email",
-        payload: {},
-      });
+  it("respects capPerKey by evicting older examples", async () => {
+    const feedback = makeFeedback([createApprovedExamplesProjection({ capPerKey: 2 })]);
+    for (const id of ["a-1", "a-2", "a-3", "a-4"]) {
+      await captureAndReact(feedback, id, "approved");
     }
-
-    const states = await feedback.queryProjection<WhitelistExamplesState>(
-      "whitelist_examples",
+    const states = await feedback.queryProjection<ApprovedExamplesState>(
+      "approved_examples",
       undefined,
     );
-    expect(states[0]!.examples.length).toBe(2);
-    // Should keep the most recent two
-    expect(states[0]!.examples.map((e) => e.artifact_id)).toEqual(["a-3", "a-4"]);
-  });
-
-  it("ignores non-whitelist events", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createWhitelistExamplesProjection()],
-    });
-
-    await feedback.capture({
-      action: "reject",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
-      payload: {},
-    });
-
-    const states = await feedback.queryProjection<WhitelistExamplesState>(
-      "whitelist_examples",
-      undefined,
-    );
-    expect(states.length).toBe(0);
+    expect(states[0]!.examples).toHaveLength(2);
+    expect(states[0]!.examples[0]!.artifact_id).toBe("a-3");
+    expect(states[0]!.examples[1]!.artifact_id).toBe("a-4");
   });
 });
 
-describe("createBlacklistPhrasesProjection", () => {
-  it("counts watched phrases removed by edits", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createBlacklistPhrasesProjection()],
-    });
+describe("createRemovedPhrasesProjection", () => {
+  it("counts watched phrases removed by manually_edited reactions", async () => {
+    const feedback = makeFeedback([createRemovedPhrasesProjection()]);
 
-    // Edit removes "i hope this email finds you well"
-    await feedback.capture({
-      action: "edit",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
+    await captureAndReact(feedback, "a-1", "manually_edited", {
       payload: {
-        original: "Hi John,\n\nI hope this email finds you well.\n\nThanks!",
-        corrected: "Hi John,\n\nThanks!",
+        original: "Dear Sir/Madam, I hope this email finds you well. Per our chat,",
+        corrected: "Dear Sir/Madam, Per our chat,",
+      },
+    });
+    await captureAndReact(feedback, "a-2", "manually_edited", {
+      payload: {
+        original:
+          "I wanted to reach out about leveraging synergies between our teams.",
+        corrected: "Following up on our conversation.",
       },
     });
 
-    const states = await feedback.queryProjection<BlacklistPhrasesState>(
-      "blacklist_phrases",
+    const [state] = await feedback.queryProjection<RemovedPhrasesState>(
+      "removed_phrases",
       undefined,
     );
-    expect(states.length).toBe(1);
-    expect(states[0]!.phrases["i hope this email finds you well"]?.count).toBe(1);
+    expect(state!.phrases["i hope this email finds you well"]?.count).toBe(1);
+    expect(state!.phrases["i wanted to reach out"]?.count).toBe(1);
+    expect(state!.phrases["leveraging synergies"]?.count).toBe(1);
   });
 
-  it("does not count when phrase remains in corrected text", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createBlacklistPhrasesProjection()],
-    });
-
-    await feedback.capture({
-      action: "edit",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
+  it("does not increment when phrase is preserved through the edit", async () => {
+    const feedback = makeFeedback([createRemovedPhrasesProjection()]);
+    await captureAndReact(feedback, "a-1", "manually_edited", {
       payload: {
-        original: "Hi, I hope this finds you well.",
-        corrected: "Hello, I hope this finds you well today.",
+        original: "Hi John, I hope this finds you well — got a question.",
+        corrected: "Hi John, I hope this finds you well, here's the question:",
       },
     });
-
-    const states = await feedback.queryProjection<BlacklistPhrasesState>(
-      "blacklist_phrases",
+    const [state] = await feedback.queryProjection<RemovedPhrasesState>(
+      "removed_phrases",
       undefined,
     );
-    // Phrase remained in both, so no increment.
-    expect(Object.keys(states[0]?.phrases ?? {}).length).toBe(0);
+    expect(state?.phrases["i hope this finds you well"]).toBeUndefined();
   });
 
-  it("supports custom watch list", async () => {
-    const feedback = createFeedback({
-      eventStore: createInMemoryEventStore(),
-      projectionStore: createInMemoryProjectionStore(),
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      projections: [createBlacklistPhrasesProjection({ watchPhrases: ["robust"] })],
-    });
-
-    await feedback.capture({
-      action: "edit",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "agent",
-      task_type: "draft:email",
-      payload: {
-        original: "We need a robust solution.",
-        corrected: "We need a solution.",
-      },
-    });
-
-    const states = await feedback.queryProjection<BlacklistPhrasesState>(
-      "blacklist_phrases",
+  it("ignores actions other than manually_edited", async () => {
+    const feedback = makeFeedback([createRemovedPhrasesProjection()]);
+    await captureAndReact(feedback, "a-1", "approved");
+    const states = await feedback.queryProjection<RemovedPhrasesState>(
+      "removed_phrases",
       undefined,
     );
-    expect(states[0]!.phrases["robust"]?.count).toBe(1);
+    // Builder applied to no events, so no row exists.
+    expect(states.length).toBe(0);
   });
 });

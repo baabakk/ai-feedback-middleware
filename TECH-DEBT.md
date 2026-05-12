@@ -1,4 +1,4 @@
-# `llm-feedback-middleware` Tech Debt Tracker
+# `ai-feedback-middleware` Tech Debt Tracker
 
 **Last updated:** 2026-05-05 (F4 Round 2 closures — 17 of 17 actionable gates resolved; only H5 remains deferred)
 
@@ -144,7 +144,7 @@ The remaining M4 scenarios (random-failure injection in publish, transactional r
 **Status:** ✅ Resolved 2026-05-05 (F4 Round 2)
 **Affected:** [`packages/adapter-conformance/src/poll.ts`](packages/adapter-conformance/src/poll.ts), [`packages/adapter-conformance/src/event-bus-conformance.ts`](packages/adapter-conformance/src/event-bus-conformance.ts)
 
-**Resolution.** Shipped `waitUntil(predicate, { timeoutMs, intervalMs })` in `poll.ts` and rewrote every `setTimeout` wait in `event-bus-conformance.ts` to use it. The suite's `deliveryWaitMs` option became `deliveryTimeoutMs` (default 1500ms) — a budget rather than a hard wait. Tests poll the predicate every 10ms and exit as soon as it passes. The new `waitUntil` is also exported from `@llm-feedback-middleware/adapter-conformance` for adapter authors to use in their own tests (e.g. the new outbox-scanner-leader test uses it). The redis-pubsub conformance test was updated to pass `deliveryTimeoutMs: 2000`.
+**Resolution.** Shipped `waitUntil(predicate, { timeoutMs, intervalMs })` in `poll.ts` and rewrote every `setTimeout` wait in `event-bus-conformance.ts` to use it. The suite's `deliveryWaitMs` option became `deliveryTimeoutMs` (default 1500ms) — a budget rather than a hard wait. Tests poll the predicate every 10ms and exit as soon as it passes. The new `waitUntil` is also exported from `@ai-feedback-middleware/adapter-conformance` for adapter authors to use in their own tests (e.g. the new outbox-scanner-leader test uses it). The redis-pubsub conformance test was updated to pass `deliveryTimeoutMs: 2000`.
 
 ---
 
@@ -219,7 +219,7 @@ Schema evolution contract is now backed by code: future minor-version bumps ship
 **Status:** ✅ Resolved 2026-05-05 (F4 Round 1)
 **Affected:** [`A02-Feedback-Middleware-Framework-Spec.md`](../A02-Feedback-Middleware-Framework-Spec.md) §9.2.1
 
-**Resolution.** Added §9.2.1 "Wildcards" to the framework spec covering both `*` (single-segment) and `>` (NATS-style tail, one-or-more remaining) with worked examples. The new section also points adapter implementers at the shared `matchesTopic` source of truth in `@llm-feedback-middleware/core` and explains the per-adapter pattern of subscribing at the broadest transport-level match plus re-filtering on receive.
+**Resolution.** Added §9.2.1 "Wildcards" to the framework spec covering both `*` (single-segment) and `>` (NATS-style tail, one-or-more remaining) with worked examples. The new section also points adapter implementers at the shared `matchesTopic` source of truth in `@ai-feedback-middleware/core` and explains the per-adapter pattern of subscribing at the broadest transport-level match plus re-filtering on receive.
 
 ---
 

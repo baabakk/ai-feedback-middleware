@@ -39,11 +39,11 @@ so the cost is small.
 A type-only contract is not enough. Adapters can satisfy an interface
 without honoring its semantics (idempotency, ordering, partition
 isolation, retry behavior). The
-[`@llm-feedback-middleware/adapter-conformance`](../../packages/adapter-conformance/README.md)
+[`@ai-feedback-middleware/adapter-conformance`](../../packages/adapter-conformance/README.md)
 package ships vitest suites that lock down the runtime contract:
 
 ```typescript
-import { runEventStoreConformance } from "@llm-feedback-middleware/adapter-conformance";
+import { runEventStoreConformance } from "@ai-feedback-middleware/adapter-conformance";
 import { createMyAdapter } from "../src/index.js";
 
 runEventStoreConformance({

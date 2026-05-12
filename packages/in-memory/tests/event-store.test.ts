@@ -1,23 +1,26 @@
 import { describe, it, expect } from "vitest";
-import type { FeedbackEvent } from "@llm-feedback-middleware/core";
+import type { CapturedEvaluatedReactionEvent } from "@ai-feedback-middleware/core";
 import { createInMemoryEventStore } from "../src/event-store.js";
 
-function makeEvent(overrides: Partial<FeedbackEvent> = {}): FeedbackEvent {
+function makeEvent(
+  overrides: Partial<CapturedEvaluatedReactionEvent> = {},
+): CapturedEvaluatedReactionEvent {
   return {
+    event_kind: "reaction",
     event_id: "e1",
-    event_version: 1,
-    timestamp: "2026-04-24T00:00:00Z",
-    captured_at: "2026-04-24T00:00:00Z",
-    partition_key: "p-1",
-    source: "explicit",
-    polarity: "positive",
-    inference: "whitelist",
-    action: "approve",
-    artifact_type: "draft",
+    event_version: 2,
     artifact_id: "p-1",
+    artifact_type: "draft_email",
     artifact_version: 1,
+    partition_key: "p-1",
     producer: "test",
     task_type: "test_task",
+    source: "explicit",
+    action: "approved",
+    evaluations: { content: "positive" },
+    classifier_version: "test-2.1",
+    occurred_at: "2026-04-24T00:00:00Z",
+    captured_at: "2026-04-24T00:00:00Z",
     payload: {},
     provenance: { channel: "test", captured_by_adapter: "test" },
     ...overrides,
@@ -35,7 +38,6 @@ describe("InMemoryEventStore", () => {
     const store = createInMemoryEventStore();
     await store.append(makeEvent({ event_id: "e1" }));
     await store.append(makeEvent({ event_id: "e2" }));
-
     const events = await collect(store.readStream("p-1"));
     expect(events.map((e) => e.event_id)).toEqual(["e1", "e2"]);
   });
@@ -45,7 +47,6 @@ describe("InMemoryEventStore", () => {
     await store.append(makeEvent({ event_id: "a", partition_key: "p-A", artifact_id: "p-A" }));
     await store.append(makeEvent({ event_id: "b", partition_key: "p-B", artifact_id: "p-B" }));
     await store.append(makeEvent({ event_id: "c", partition_key: "p-A", artifact_id: "p-A" }));
-
     expect((await collect(store.readStream("p-A"))).map((e) => e.event_id)).toEqual(["a", "c"]);
     expect((await collect(store.readStream("p-B"))).map((e) => e.event_id)).toEqual(["b"]);
   });
@@ -71,30 +72,35 @@ describe("InMemoryEventStore", () => {
     expect((await collect(store.readAll())).map((e) => e.event_id)).toEqual(["a", "b"]);
   });
 
-  it("readAll respects polarity filter", async () => {
-    const store = createInMemoryEventStore();
-    await store.append(makeEvent({ event_id: "p", polarity: "positive" }));
-    await store.append(
-      makeEvent({ event_id: "n", polarity: "negative", inference: "blacklist", action: "reject" }),
-    );
-    const negs = await collect(store.readAll({ polarity: "negative" }));
-    expect(negs.map((e) => e.event_id)).toEqual(["n"]);
-  });
-
   it("readAll respects action filter", async () => {
     const store = createInMemoryEventStore();
-    await store.append(makeEvent({ event_id: "a1", action: "approve" }));
+    await store.append(makeEvent({ event_id: "a1", action: "approved" }));
     await store.append(
       makeEvent({
         event_id: "e1",
-        action: "edit",
-        polarity: "negative",
-        inference: "blacklist",
+        action: "manually_edited",
+        evaluations: { content: "negative" },
       }),
     );
-    expect((await collect(store.readAll({ action: "approve" }))).map((e) => e.event_id)).toEqual([
+    expect((await collect(store.readAll({ action: "approved" }))).map((e) => e.event_id)).toEqual([
       "a1",
     ]);
+  });
+
+  it("readAll respects source filter", async () => {
+    const store = createInMemoryEventStore();
+    await store.append(makeEvent({ event_id: "expl", source: "explicit" }));
+    await store.append(
+      makeEvent({
+        event_id: "impl",
+        source: "implicit",
+        action: "silently_accepted",
+        evaluations: { detection: "positive", content: "positive" },
+      }),
+    );
+    expect(
+      (await collect(store.readAll({ source: "explicit" }))).map((e) => e.event_id),
+    ).toEqual(["expl"]);
   });
 
   it("subscribeAll receives appended events", async () => {
@@ -108,7 +114,7 @@ describe("InMemoryEventStore", () => {
     expect(received).toEqual(["s1", "s2"]);
     await unsub();
     await store.append(makeEvent({ event_id: "s3" }));
-    expect(received).toEqual(["s1", "s2"]); // s3 not delivered after unsubscribe
+    expect(received).toEqual(["s1", "s2"]);
   });
 
   it("seed initializes the store with events", async () => {

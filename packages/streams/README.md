@@ -1,11 +1,11 @@
-# @llm-feedback-middleware/streams
+# @ai-feedback-middleware/streams
 
 Optional RxJS stream wrapper for `EventBusPort`. Use only if your subscribers benefit from operators like `debounce`, `bufferTime`, `groupBy`, `windowTime`. Consumers that don't need these never import this package.
 
 ## Install
 
 ```bash
-npm install @llm-feedback-middleware/streams rxjs
+npm install @ai-feedback-middleware/streams rxjs
 ```
 
 ## Use
@@ -18,7 +18,7 @@ import {
   groupBy,
   mergeMap,
   tap,
-} from "@llm-feedback-middleware/streams";
+} from "@ai-feedback-middleware/streams";
 
 // 3 regenerates on the same task within 7 days -> blacklist promotion
 toStream(bus, "feedback.captured.*")

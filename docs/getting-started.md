@@ -29,14 +29,14 @@ If your two lists fit on a sticky note, you are ready.
 ## 2. Install
 
 ```bash
-pnpm add @llm-feedback-middleware/core @llm-feedback-middleware/in-memory
+pnpm add @ai-feedback-middleware/core @ai-feedback-middleware/in-memory
 ```
 
 Adapter packages are independent, so install only what you need. For a
 real deployment you will likely also want:
 
 ```bash
-pnpm add @llm-feedback-middleware/postgres @llm-feedback-middleware/redis-pubsub pg ioredis
+pnpm add @ai-feedback-middleware/postgres @ai-feedback-middleware/redis-pubsub pg ioredis
 ```
 
 ## 3. Compose the framework
@@ -45,11 +45,11 @@ The framework is built around `createFeedback(options): FeedbackPort`.
 Wire in an event store, a projection store, and your registries:
 
 ```typescript
-import { createFeedback, DEFAULT_ACTIONS } from "@llm-feedback-middleware/core";
+import { createFeedback, DEFAULT_ACTIONS } from "@ai-feedback-middleware/core";
 import {
   createInMemoryEventStore,
   createInMemoryProjectionStore,
-} from "@llm-feedback-middleware/in-memory";
+} from "@ai-feedback-middleware/in-memory";
 
 const feedback = createFeedback({
   eventStore: createInMemoryEventStore(),

@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { ProjectionStorePort } from "@llm-feedback-middleware/core";
+import type { ProjectionStorePort } from "@ai-feedback-middleware/core";
 
 export interface PostgresProjectionStoreOptions {
   pool: Pool;

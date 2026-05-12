@@ -1,75 +1,161 @@
-import type { Inference } from "./event-types.js";
-import type { InferenceRule, RulePredicate } from "./ports/inference-rules-port.js";
+import type {
+  AxisInference,
+  AxisPolarity,
+  Axis,
+  CapturedEvaluatedReactionEvent,
+} from "./event-types.js";
+import type { ActionabilityRule, RulePredicate } from "./ports/actionability-rules-port.js";
+import { TOMBSTONE_ACTION_NAMES } from "./registry/default-actions.js";
 
 /**
- * Context passed to the inference engine at classification time.
+ * Layer 4 — Actionable Result Inference.
  *
- * `recentActions` is the history for the same partition (or producer/task)
- * within a sliding window. Adapters typically scope this query in createFeedback.
+ * Pure deterministic engine. Reads recent evaluated reactions, applies
+ * threshold rules from `actionability_rules`, filters tombstoned artifacts,
+ * and emits per-axis decisions.
+ *
+ * Tombstone filtering is direction-symmetric: an artifact whose events were
+ * trending toward `actionable_positive` is excluded just as completely as
+ * one trending toward `actionable_negative` once a tombstone arrives.
+ *
+ * See spec §12 and architecture §29 (Layer 4).
  */
+
+export interface ActionabilityDecision {
+  decision_id: string;
+  rule_id: string;
+  rule_version: string;
+  rule_run_at: string;
+  artifact_id: string;
+  axis: Axis;
+  inference: AxisInference;
+  evidence_event_ids: string[];
+}
+
 export interface InferenceContext {
-  action: string;
-  task_type: string;
-  producer: string;
-  artifact_type: string;
-  /** Recent events on the same partition. Used to count threshold matches. */
-  recentActions: ReadonlyArray<{ action: string; timestamp: string }>;
-  /** Now timestamp. Defaults to `new Date().toISOString()`. */
+  /** ISO timestamp; defaults to `new Date().toISOString()` if omitted. */
   now?: string;
+  /** Stable id factory; defaults to `crypto.randomUUID`. */
+  generateDecisionId?: () => string;
 }
 
 /**
- * Pure function: given the rules + context, return the inference outcome.
+ * Compute per-axis actionability decisions for a single rule against a set
+ * of candidate reactions. Returns one decision per artifact that matched
+ * the rule's threshold.
  *
- * Evaluation is first-match-wins in registration order. A rule matches if:
- *   1. Its predicate matches the current event's metadata.
- *   2. The number of `recentActions` matching the predicate within `window_ms`
- *      meets or exceeds `threshold`.
- *
- * If no rule matches, callers fall back to the action's `defaultInference`.
+ * The caller is responsible for selecting candidate reactions (via the
+ * EventStore / TrackedArtifacts query layer) and for collecting the set of
+ * tombstoned artifact_ids to exclude.
+ */
+export function evaluateRule(
+  rule: ActionabilityRule,
+  candidateReactions: ReadonlyArray<CapturedEvaluatedReactionEvent>,
+  tombstonedArtifactIds: ReadonlySet<string>,
+  context: InferenceContext = {},
+): ActionabilityDecision[] {
+  if (!rule.active) return [];
+
+  const now = context.now ?? new Date().toISOString();
+  const nowMs = Date.parse(now);
+  const cutoffMs = nowMs - rule.window_ms;
+  const generateId = context.generateDecisionId ?? defaultDecisionId;
+
+  // Filter to rule predicate + window + non-tombstoned + non-meta + axis-matching polarity.
+  const inWindow = candidateReactions.filter((r) => {
+    if (TOMBSTONE_ACTION_NAMES.includes(r.action as never)) return false;
+    if (tombstonedArtifactIds.has(r.artifact_id)) return false;
+    const t = Date.parse(r.occurred_at);
+    if (Number.isNaN(t) || t < cutoffMs) return false;
+    if (!matchesPredicate(rule.applies_when, r)) return false;
+    // The reaction's polarity on this axis must match the rule's intended
+    // direction. A rule with result_if_met=actionable_negative counts only
+    // reactions whose `evaluations[axis] === 'negative'`.
+    const axisPolarity = r.evaluations[rule.axis];
+    if (!matchesIntendedDirection(axisPolarity, rule.result_if_met)) return false;
+    return true;
+  });
+
+  // Group by artifact_id; emit one decision per artifact whose count crosses threshold.
+  const groups = new Map<string, CapturedEvaluatedReactionEvent[]>();
+  for (const r of inWindow) {
+    const list = groups.get(r.artifact_id) ?? [];
+    list.push(r);
+    groups.set(r.artifact_id, list);
+  }
+
+  const decisions: ActionabilityDecision[] = [];
+  for (const [artifact_id, group] of groups) {
+    if (group.length >= rule.threshold) {
+      decisions.push({
+        decision_id: generateId(),
+        rule_id: rule.rule_id,
+        rule_version: rule.rule_version,
+        rule_run_at: now,
+        artifact_id,
+        axis: rule.axis,
+        inference: rule.result_if_met,
+        evidence_event_ids: group.map((r) => r.event_id),
+      });
+    }
+  }
+  return decisions;
+}
+
+/**
+ * Convenience: evaluate every rule in a list against the same candidate set.
+ * Returns the flattened set of decisions.
  */
 export function evaluateRules(
-  rules: InferenceRule[],
-  context: InferenceContext,
-  defaultInference: Inference,
-): Inference {
-  const nowMs = Date.parse(context.now ?? new Date().toISOString());
-
+  rules: ReadonlyArray<ActionabilityRule>,
+  candidateReactions: ReadonlyArray<CapturedEvaluatedReactionEvent>,
+  tombstonedArtifactIds: ReadonlySet<string>,
+  context: InferenceContext = {},
+): ActionabilityDecision[] {
+  const out: ActionabilityDecision[] = [];
   for (const rule of rules) {
-    if (!rule.active) continue;
-    if (!matchesPredicate(rule.applies_when, context)) continue;
-
-    const cutoffMs = nowMs - rule.window_ms;
-    let count = 0;
-    for (const recent of context.recentActions) {
-      const t = Date.parse(recent.timestamp);
-      if (Number.isNaN(t)) continue;
-      if (t < cutoffMs) continue;
-      // The recent event must also match the predicate (e.g., same action).
-      if (!matchesPredicate(rule.applies_when, { ...context, action: recent.action })) continue;
-      count++;
-      if (count >= rule.threshold) {
-        return rule.result_if_met;
-      }
-    }
-    // Predicate matched but threshold did not; honor result_if_unmet (default observe).
-    return rule.result_if_unmet ?? "observe";
+    out.push(...evaluateRule(rule, candidateReactions, tombstonedArtifactIds, context));
   }
-  return defaultInference;
+  return out;
 }
 
-function matchesPredicate(predicate: RulePredicate, context: InferenceContext): boolean {
-  if (predicate.action !== undefined && predicate.action !== context.action) return false;
-  if (predicate.task_type !== undefined && predicate.task_type !== context.task_type) return false;
+function matchesPredicate(
+  predicate: RulePredicate,
+  reaction: CapturedEvaluatedReactionEvent,
+): boolean {
+  if (predicate.action !== undefined && predicate.action !== reaction.action) return false;
+  if (predicate.task_type !== undefined && predicate.task_type !== reaction.task_type) {
+    return false;
+  }
   if (
     predicate.task_type_prefix !== undefined &&
-    !context.task_type.startsWith(predicate.task_type_prefix)
+    !reaction.task_type.startsWith(predicate.task_type_prefix)
   ) {
     return false;
   }
-  if (predicate.producer !== undefined && predicate.producer !== context.producer) return false;
-  if (predicate.artifact_type !== undefined && predicate.artifact_type !== context.artifact_type) {
+  if (predicate.producer !== undefined && predicate.producer !== reaction.producer) return false;
+  if (
+    predicate.artifact_type !== undefined &&
+    predicate.artifact_type !== reaction.artifact_type
+  ) {
     return false;
   }
   return true;
+}
+
+function matchesIntendedDirection(
+  axisPolarity: AxisPolarity | undefined,
+  resultIfMet: Exclude<AxisInference, "continue_to_observe">,
+): boolean {
+  if (axisPolarity === undefined) return false;
+  if (resultIfMet === "actionable_positive") return axisPolarity === "positive";
+  if (resultIfMet === "actionable_negative") return axisPolarity === "negative";
+  return false;
+}
+
+function defaultDecisionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `dec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

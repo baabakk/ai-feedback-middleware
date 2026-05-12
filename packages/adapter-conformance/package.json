@@ -1,17 +1,17 @@
 {
-  "name": "@llm-feedback-middleware/adapter-conformance",
-  "version": "0.0.0",
+  "name": "@ai-feedback-middleware/adapter-conformance",
+  "version": "0.3.0-alpha.0",
   "description": "Conformance test suites that any EventStorePort or ProjectionStorePort adapter must pass.",
   "license": "Apache-2.0",
   "author": "Babak Abbaschian",
-  "homepage": "https://github.com/baabakk/llm-feedback-middleware",
+  "homepage": "https://github.com/baabakk/ai-feedback-middleware",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
+    "url": "git+https://github.com/baabakk/ai-feedback-middleware.git",
     "directory": "packages/adapter-conformance"
   },
   "bugs": {
-    "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
+    "url": "https://github.com/baabakk/ai-feedback-middleware/issues"
   },
   "keywords": [
     "feedback",
@@ -41,7 +41,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*"
+    "@ai-feedback-middleware/core": "workspace:*"
   },
   "peerDependencies": {
     "vitest": "^2.0.0 || ^3.0.0"

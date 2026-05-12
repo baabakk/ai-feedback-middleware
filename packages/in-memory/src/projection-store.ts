@@ -1,4 +1,4 @@
-import type { ProjectionStorePort } from "@llm-feedback-middleware/core";
+import type { ProjectionStorePort } from "@ai-feedback-middleware/core";
 
 export function createInMemoryProjectionStore(): ProjectionStorePort {
   // projection_name -> key -> { state, eventId }

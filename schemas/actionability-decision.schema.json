@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/baabakk/ai-feedback-middleware/schemas/actionability-decision.schema.json",
+  "title": "ActionabilityDecision",
+  "description": "Layer 4 (Actionable Result Inference) output. One row per (rule_run, artifact, axis). Source of truth lives in packages/core/src/inference-engine.ts.",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "rule_id",
+    "rule_version",
+    "rule_run_at",
+    "artifact_id",
+    "axis",
+    "inference",
+    "evidence_event_ids"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision_id": { "type": "string" },
+    "rule_id": { "type": "string" },
+    "rule_version": { "type": "string" },
+    "rule_run_at": { "type": "string", "format": "date-time" },
+    "artifact_id": { "type": "string" },
+    "axis": {
+      "type": "string",
+      "enum": ["detection", "content", "timing", "channel"]
+    },
+    "inference": {
+      "type": "string",
+      "enum": ["actionable_positive", "actionable_negative", "continue_to_observe"]
+    },
+    "evidence_event_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

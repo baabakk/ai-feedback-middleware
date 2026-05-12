@@ -1,4 +1,4 @@
-# `@llm-feedback-middleware/core`
+# `@ai-feedback-middleware/core`
 
 The framework's pure-domain layer. Defines event types, registries, the
 deterministic classifier, the inference engine, the projection engine, the
@@ -13,12 +13,12 @@ a database driver.
 ## Install
 
 ```bash
-pnpm add @llm-feedback-middleware/core
+pnpm add @ai-feedback-middleware/core
 # pick at least one adapter package for storage:
-pnpm add @llm-feedback-middleware/in-memory   # tests, toy deployments
+pnpm add @ai-feedback-middleware/in-memory   # tests, toy deployments
 # or
-pnpm add @llm-feedback-middleware/postgres
-pnpm add @llm-feedback-middleware/redis-pubsub
+pnpm add @ai-feedback-middleware/postgres
+pnpm add @ai-feedback-middleware/redis-pubsub
 ```
 
 The package is ESM-only and targets Node 18+.
@@ -84,11 +84,11 @@ The package is ESM-only and targets Node 18+.
 ## Quickstart
 
 ```typescript
-import { createFeedback, DEFAULT_ACTIONS } from "@llm-feedback-middleware/core";
+import { createFeedback, DEFAULT_ACTIONS } from "@ai-feedback-middleware/core";
 import {
   createInMemoryEventStore,
   createInMemoryProjectionStore,
-} from "@llm-feedback-middleware/in-memory";
+} from "@ai-feedback-middleware/in-memory";
 
 const feedback = createFeedback({
   eventStore: createInMemoryEventStore(),

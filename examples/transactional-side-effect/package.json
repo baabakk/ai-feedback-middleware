@@ -10,8 +10,8 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*",
-    "@llm-feedback-middleware/postgres": "workspace:*",
+    "@ai-feedback-middleware/core": "workspace:*",
+    "@ai-feedback-middleware/postgres": "workspace:*",
     "pg": "^8.13.1"
   },
   "devDependencies": {

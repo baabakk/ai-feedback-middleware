@@ -6,7 +6,7 @@ import {
   type Unsubscribe,
   assertSupportedSubscribeOptions,
   matchesTopic,
-} from "@llm-feedback-middleware/core";
+} from "@ai-feedback-middleware/core";
 
 const CAPABILITIES: SubscribeCapabilities = {
   adapterName: "createInMemoryEventBus",
@@ -35,7 +35,7 @@ interface Subscription {
 /**
  * In-memory event bus using simple pattern matching. Supports `*` wildcards
  * (single-segment) and `>` wildcard (everything from here on, NATS-style),
- * via `matchesTopic` from `@llm-feedback-middleware/core`.
+ * via `matchesTopic` from `@ai-feedback-middleware/core`.
  *
  * Designed for tests and toy single-node deployments. No durability, no
  * cross-process delivery, no backpressure.
@@ -71,11 +71,12 @@ export function createInMemoryEventBus(options: InMemoryEventBusOptions = {}): E
       }
     },
 
-    subscribe(
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async subscribe(
       topic: string | string[],
       handler: (event: FeedbackEvent, topic: string) => Promise<void>,
       options?: SubscribeOptions,
-    ): Unsubscribe {
+    ): Promise<Unsubscribe> {
       assertSupportedSubscribeOptions(options, CAPABILITIES);
       const sub: Subscription = {
         patterns: Array.isArray(topic) ? topic : [topic],

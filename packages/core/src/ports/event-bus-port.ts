@@ -81,14 +81,20 @@ export interface EventBusPort {
   publishBatch?(topic: string, events: FeedbackEvent[]): Promise<void>;
 
   /**
-   * Subscribe to a topic (or array of topics). Returns an unsubscribe function.
+   * Subscribe to a topic (or array of topics). Returns a Promise resolving
+   * to an unsubscribe function. The promise resolves only after the
+   * underlying subscription is registered with the broker — for Redis pub/sub
+   * this is the SUBSCRIBE/PSUBSCRIBE round-trip; for in-memory adapters
+   * this resolves on the next microtask. Callers MUST await the returned
+   * promise before publishing if they want delivery guarantees.
+   *
    * Topic wildcards are adapter-dependent (Redis PSUBSCRIBE, Kafka regex, etc.).
    */
   subscribe(
     topic: string | string[],
     handler: (event: FeedbackEvent, topic: string) => Promise<void>,
     options?: SubscribeOptions,
-  ): Unsubscribe;
+  ): Promise<Unsubscribe>;
 
   /**
    * Optional: load-balanced consumption across multiple subscribers in the
@@ -99,27 +105,68 @@ export interface EventBusPort {
     topic: string,
     groupId: string,
     handler: (event: FeedbackEvent, topic: string) => Promise<void>,
-  ): Unsubscribe;
+  ): Promise<Unsubscribe>;
 }
 
 /**
- * Build the canonical set of topics for a feedback event.
+ * Build the canonical set of topics for a feedback event. See spec §15.
  *
- * Publishers emit to multiple topics per event so subscribers can filter
- * narrowly (`feedback.captured.explicit.positive`) or broadly (`feedback.captured`).
+ * Capture-kind events publish to:
+ *   - feedback.captured
+ *   - feedback.captured.<artifact_type>
+ *   - feedback.artifact.<artifact_type>
+ *   - feedback.producer.<producer>
+ *
+ * Reaction-kind events publish to:
+ *   - feedback.reaction
+ *   - feedback.reaction.<source>                  (explicit | implicit | meta)
+ *   - feedback.reaction.action.<action>
+ *   - feedback.artifact.<artifact_type>
+ *   - feedback.producer.<producer>
+ *   - feedback.tombstone.<action>                  (only when action is a tombstone)
+ *
+ * Per-axis inference topics (`feedback.inference.<axis>.<value>`) are
+ * published by the Layer 4 emitter when an `actionability_decision` is
+ * crystallized, not by raw event publish. See {@link topicsForActionabilityDecision}.
  */
 export function topicsFor(event: FeedbackEvent): string[] {
+  if (event.event_kind === "capture") {
+    return [
+      "feedback.captured",
+      `feedback.captured.${event.artifact_type}`,
+      `feedback.artifact.${event.artifact_type}`,
+      `feedback.producer.${event.producer}`,
+    ];
+  }
+
+  // Reaction event
   const topics: string[] = [
-    "feedback.captured",
-    `feedback.captured.${event.source}`,
-    `feedback.captured.${event.source}.${event.polarity}`,
-    `feedback.inference.${event.inference}`,
+    "feedback.reaction",
+    `feedback.reaction.${event.source}`,
+    `feedback.reaction.action.${event.action}`,
     `feedback.artifact.${event.artifact_type}`,
     `feedback.producer.${event.producer}`,
-    `feedback.action.${event.action}`,
   ];
-  if (event.correction_of) {
-    topics.push("feedback.correction");
+
+  if (event.action === "corrected" || event.action === "cancelled" || event.action === "superseded_by") {
+    topics.push(`feedback.tombstone.${event.action}`);
+  }
+  return topics;
+}
+
+/**
+ * Per-axis inference topics emitted when Layer 4 crystallizes a decision.
+ * Format: `feedback.inference.<axis>.<value>` and
+ * `feedback.inference.<axis>.<value>.<artifact_type>`.
+ */
+export function topicsForActionabilityDecision(decision: {
+  axis: string;
+  inference: string;
+  artifact_type?: string;
+}): string[] {
+  const topics = [`feedback.inference.${decision.axis}.${decision.inference}`];
+  if (decision.artifact_type) {
+    topics.push(`feedback.inference.${decision.axis}.${decision.inference}.${decision.artifact_type}`);
   }
   return topics;
 }

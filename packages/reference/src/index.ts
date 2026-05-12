@@ -1,12 +1,22 @@
 // Reference projections
 export { approvalRateProjection, type ApprovalRateState } from "./projections/approval-rate.js";
 export {
+  createApprovedExamplesProjection,
+  type ApprovedExample,
+  type ApprovedExamplesState,
+  type ApprovedExamplesOptions,
+  // Deprecated v1 aliases
   createWhitelistExamplesProjection,
   type WhitelistExample,
   type WhitelistExamplesState,
   type WhitelistExamplesOptions,
 } from "./projections/whitelist-examples.js";
 export {
+  createRemovedPhrasesProjection,
+  type RemovedPhrase,
+  type RemovedPhrasesState,
+  type RemovedPhrasesOptions,
+  // Deprecated v1 aliases
   createBlacklistPhrasesProjection,
   type BlacklistPhrase,
   type BlacklistPhrasesState,

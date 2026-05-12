@@ -1,6 +1,6 @@
 # threshold-crystallization
 
-Demonstrates `@llm-feedback-middleware/streams` for stateful across-event aggregation.
+Demonstrates `@ai-feedback-middleware/streams` for stateful across-event aggregation.
 
 ## What it shows
 

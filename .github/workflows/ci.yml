@@ -70,10 +70,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build core (required by adapter packages)
-        run: pnpm --filter @llm-feedback-middleware/core build
+        run: pnpm --filter @ai-feedback-middleware/core build
 
       - name: Build adapter-conformance (required by tests)
-        run: pnpm --filter @llm-feedback-middleware/adapter-conformance build
+        run: pnpm --filter @ai-feedback-middleware/adapter-conformance build
 
       - name: Lint
         if: matrix.node-version == 22
@@ -87,18 +87,18 @@ jobs:
         run: pnpm typecheck
 
       - name: Test (in-memory + core)
-        run: pnpm --filter @llm-feedback-middleware/core --filter @llm-feedback-middleware/in-memory test
+        run: pnpm --filter @ai-feedback-middleware/core --filter @ai-feedback-middleware/in-memory test
 
       - name: Test (streams + reference)
-        run: pnpm --filter @llm-feedback-middleware/streams --filter @llm-feedback-middleware/reference test
+        run: pnpm --filter @ai-feedback-middleware/streams --filter @ai-feedback-middleware/reference test
 
       - name: Test (postgres, against service container)
         if: matrix.node-version == 22
-        run: pnpm --filter @llm-feedback-middleware/postgres test
+        run: pnpm --filter @ai-feedback-middleware/postgres test
 
       - name: Test (redis-pubsub, against service container)
         if: matrix.node-version == 22
-        run: pnpm --filter @llm-feedback-middleware/redis-pubsub test
+        run: pnpm --filter @ai-feedback-middleware/redis-pubsub test
 
       - name: Dependency boundaries
         if: matrix.node-version == 22

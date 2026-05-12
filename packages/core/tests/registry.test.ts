@@ -1,21 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { ActionRegistry } from "../src/registry/actions.js";
-import { ArtifactTypeRegistry } from "../src/registry/artifact-types.js";
+import {
+  ArtifactTypeRegistry,
+  acceptByDefault,
+  rejectByDefault,
+} from "../src/registry/artifact-types.js";
 import { DEFAULT_ACTIONS } from "../src/registry/default-actions.js";
 
 describe("ActionRegistry", () => {
   it("registers and retrieves actions", () => {
     const r = new ActionRegistry();
     r.register({
-      name: "approve",
-      polarity: "positive",
-      defaultInference: "whitelist",
+      name: "approved",
       source: "explicit",
+      defaultEvaluations: {
+        detection: "positive",
+        content: "positive",
+        timing: "positive",
+        channel: "positive",
+      },
       payloadSchema: z.object({}),
     });
-    expect(r.has("approve")).toBe(true);
-    expect(r.get("approve").polarity).toBe("positive");
+    expect(r.has("approved")).toBe(true);
+    expect(r.get("approved").defaultEvaluations.content).toBe("positive");
   });
 
   it("constructs from a list", () => {
@@ -29,18 +37,16 @@ describe("ActionRegistry", () => {
   it("throws on duplicate registration", () => {
     const r = new ActionRegistry();
     r.register({
-      name: "approve",
-      polarity: "positive",
-      defaultInference: "whitelist",
+      name: "approved",
       source: "explicit",
+      defaultEvaluations: { content: "positive" },
       payloadSchema: z.object({}),
     });
     expect(() =>
       r.register({
-        name: "approve",
-        polarity: "positive",
-        defaultInference: "whitelist",
+        name: "approved",
         source: "explicit",
+        defaultEvaluations: { content: "positive" },
         payloadSchema: z.object({}),
       }),
     ).toThrow(/already registered/);
@@ -56,47 +62,94 @@ describe("ActionRegistry", () => {
 describe("ArtifactTypeRegistry", () => {
   it("registers and retrieves types", () => {
     const r = new ArtifactTypeRegistry();
-    r.register({ name: "draft" });
-    expect(r.has("draft")).toBe(true);
-    expect(r.get("draft").name).toBe("draft");
+    r.register(rejectByDefault("draft_email"));
+    expect(r.has("draft_email")).toBe(true);
+    expect(r.get("draft_email").name).toBe("draft_email");
+    expect(r.get("draft_email").expirationPolicy).toBe("rejected_by_default");
   });
 
   it("throws on duplicate registration", () => {
     const r = new ArtifactTypeRegistry();
-    r.register({ name: "draft" });
-    expect(() => r.register({ name: "draft" })).toThrow(/already registered/);
+    r.register(rejectByDefault("draft_email"));
+    expect(() => r.register(rejectByDefault("draft_email"))).toThrow(/already registered/);
   });
 
   it("throws with helpful message on unknown type", () => {
-    const r = new ArtifactTypeRegistry([{ name: "draft" }, { name: "summary" }]);
+    const r = new ArtifactTypeRegistry([
+      rejectByDefault("draft_email"),
+      acceptByDefault("morning_briefing"),
+    ]);
     expect(() => r.get("transcription")).toThrow(/Unknown artifact type: transcription/);
-    expect(() => r.get("transcription")).toThrow(/draft.*summary|summary.*draft/);
+    expect(() => r.get("transcription")).toThrow(
+      /draft_email.*morning_briefing|morning_briefing.*draft_email/,
+    );
+  });
+
+  it("rejects registration without expirationPolicy", () => {
+    const r = new ArtifactTypeRegistry();
+    expect(() => r.register({ name: "ill-formed" } as never)).toThrow(/expirationPolicy/);
   });
 });
 
 describe("DEFAULT_ACTIONS", () => {
-  it("contains the six framework defaults", () => {
+  it("contains the thirteen framework-locked actions", () => {
     const names = DEFAULT_ACTIONS.map((a) => a.name).sort();
-    expect(names).toEqual(["approve", "edit", "expired", "regenerate", "reject", "silent_accept"]);
+    expect(names).toEqual(
+      [
+        "approved",
+        "cancelled",
+        "corrected",
+        "internally_unobserved_externally_completed",
+        "manually_edited",
+        "manually_replaced",
+        "mute_triggered",
+        "not_selected_from_list",
+        "regenerated",
+        "rejected",
+        "silently_accepted",
+        "silently_rejected_expired",
+        "superseded_by",
+      ].sort(),
+    );
   });
 
-  it("each default has correct polarity", () => {
+  it("explicit actions are tagged source='explicit'", () => {
     const byName = Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.name, a]));
-    expect(byName["approve"]!.polarity).toBe("positive");
-    expect(byName["silent_accept"]!.polarity).toBe("positive");
-    expect(byName["edit"]!.polarity).toBe("negative");
-    expect(byName["reject"]!.polarity).toBe("negative");
-    expect(byName["regenerate"]!.polarity).toBe("negative");
-    expect(byName["expired"]!.polarity).toBe("negative");
+    for (const name of [
+      "approved",
+      "manually_edited",
+      "rejected",
+      "regenerated",
+      "not_selected_from_list",
+      "mute_triggered",
+    ]) {
+      expect(byName[name]!.source).toBe("explicit");
+    }
   });
 
-  it("each default has correct source", () => {
+  it("implicit actions are tagged source='implicit'", () => {
     const byName = Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.name, a]));
-    expect(byName["approve"]!.source).toBe("explicit");
-    expect(byName["edit"]!.source).toBe("explicit");
-    expect(byName["reject"]!.source).toBe("explicit");
-    expect(byName["regenerate"]!.source).toBe("explicit");
-    expect(byName["expired"]!.source).toBe("implicit");
-    expect(byName["silent_accept"]!.source).toBe("implicit");
+    for (const name of [
+      "silently_accepted",
+      "silently_rejected_expired",
+      "internally_unobserved_externally_completed",
+      "manually_replaced",
+    ]) {
+      expect(byName[name]!.source).toBe("implicit");
+    }
+  });
+
+  it("tombstone actions are tagged source='meta' with empty default evaluations", () => {
+    const byName = Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.name, a]));
+    for (const name of ["corrected", "cancelled", "superseded_by"]) {
+      expect(byName[name]!.source).toBe("meta");
+      expect(byName[name]!.defaultEvaluations).toEqual({});
+    }
+  });
+
+  it("rejected leaves the detection axis empty by default", () => {
+    const byName = Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.name, a]));
+    expect(byName["rejected"]!.defaultEvaluations.detection).toBeUndefined();
+    expect(byName["rejected"]!.defaultEvaluations.content).toBe("negative");
   });
 });

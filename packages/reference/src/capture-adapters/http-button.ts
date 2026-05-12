@@ -1,14 +1,11 @@
-import type { CaptureInput, FeedbackPort } from "@llm-feedback-middleware/core";
+import type { CapturePort, RecordReactionInput } from "@ai-feedback-middleware/core";
 
 export interface HttpButtonClickPayload {
-  action: string;
-  artifact_type: string;
+  /** REQUIRED. The artifact that was already captured and is now being reacted to. */
   artifact_id: string;
-  artifact_version: number;
-  producer: string;
-  task_type: string;
+  /** Action name from `DEFAULT_ACTIONS` (e.g. `approved`, `rejected`). */
+  action: string;
   payload?: unknown;
-  partition_key?: string;
   /** Optional UI-side latency (ms from artifact display to button click). */
   latency_ms?: number;
 }
@@ -18,31 +15,34 @@ export interface HttpButtonClickPayload {
  * (Express, Fastify, Hono, etc.) so the route just calls
  * `adapter.handle(payload, channel)` after auth/validation.
  *
- * The adapter does the framework's `feedback.capture()` and returns the
- * generated event_id. The route returns it to the client.
+ * v2.1: a button click is naturally a *reaction* to an already-captured
+ * artifact. The route caller is responsible for having opened the lifecycle
+ * via `captureArtifact()` earlier (typically when the artifact was rendered
+ * to the user).
+ *
+ * The adapter calls `feedback.recordReaction()` and returns the generated
+ * event_id. The route returns it to the client.
  */
-export function createHttpButtonCaptureAdapter(feedback: FeedbackPort): {
-  handle: (payload: HttpButtonClickPayload, channel?: string) => Promise<{ event_id: string }>;
+export function createHttpButtonCaptureAdapter(feedback: CapturePort): {
+  handle: (
+    payload: HttpButtonClickPayload,
+    channel?: string,
+  ) => Promise<{ event_id: string }>;
 } {
   return {
     async handle(payload, channel = "http") {
-      const input: CaptureInput = {
-        action: payload.action,
-        artifact_type: payload.artifact_type,
+      const input: RecordReactionInput = {
         artifact_id: payload.artifact_id,
-        artifact_version: payload.artifact_version,
-        producer: payload.producer,
-        task_type: payload.task_type,
-        payload: payload.payload ?? {},
+        action: payload.action,
+        payload: payload.payload,
         provenance: {
           channel,
           captured_by_adapter: "http_button",
           ...(payload.latency_ms !== undefined && { latency_ms: payload.latency_ms }),
         },
-        ...(payload.partition_key !== undefined && { partition_key: payload.partition_key }),
       };
-      const event_id = await feedback.capture(input);
-      return { event_id };
+      const result = await feedback.recordReaction(input);
+      return { event_id: result.event_id };
     },
   };
 }

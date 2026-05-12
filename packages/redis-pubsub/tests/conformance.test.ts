@@ -1,5 +1,5 @@
 import { afterAll, describe, it } from "vitest";
-import { runEventBusConformance } from "@llm-feedback-middleware/adapter-conformance";
+import { runEventBusConformance } from "@ai-feedback-middleware/adapter-conformance";
 import { createRedisPubSubEventBus } from "../src/index.js";
 
 const connectionString = process.env.FEEDBACK_TEST_REDIS_URL ?? process.env.TEST_REDIS_URL;
@@ -7,7 +7,7 @@ const connectionString = process.env.FEEDBACK_TEST_REDIS_URL ?? process.env.TEST
 const skip = !connectionString;
 
 if (skip) {
-  describe.skip("@llm-feedback-middleware/redis-pubsub conformance", () => {
+  describe.skip("@ai-feedback-middleware/redis-pubsub conformance", () => {
     it("skipped: set FEEDBACK_TEST_REDIS_URL or TEST_REDIS_URL to run Redis tests", () => {
       // intentionally empty
     });

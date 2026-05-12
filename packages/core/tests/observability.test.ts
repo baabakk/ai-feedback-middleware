@@ -1,14 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { z } from "zod";
 import {
   createFeedback,
   DEFAULT_ACTIONS,
+  rejectByDefault,
+  type ActionabilityRulesPort,
+  type ActionabilityDecisionsStore,
+  type CapturedEvaluatedReactionEvent,
   type EventBusPort,
-  type FeedbackEvent,
   type EventStorePort,
+  type FeedbackEvent,
   type ProjectionStorePort,
-  type EventFilter,
+  type TrackedArtifactRow,
+  type TrackedArtifactStatus,
+  type TrackedArtifactsPort,
 } from "../src/index.js";
+
+const FUTURE = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
 function makeStore(): EventStorePort {
   const events: FeedbackEvent[] = [];
@@ -28,15 +35,23 @@ function makeStore(): EventStorePort {
     async *readStreamSince(pk, since) {
       const cutoff = Date.parse(since);
       for (const e of events.filter((x) => x.partition_key === pk)) {
-        const t = Date.parse(e.timestamp);
+        const t = Date.parse(e.occurred_at);
         if (!Number.isNaN(t) && t >= cutoff) yield e;
       }
     },
-    async *readAll(_filter?: EventFilter) {
+    async *readAll() {
       for (const e of events) yield e;
     },
-    subscribeAll(_h) {
+    subscribeAll() {
       return async () => {};
+    },
+    async readRecentReactions() {
+      return events.filter(
+        (e): e is CapturedEvaluatedReactionEvent => e.event_kind === "reaction",
+      );
+    },
+    async readTombstonedArtifactIds() {
+      return new Set<string>();
     },
   };
 }
@@ -58,18 +73,54 @@ function makeProjStore(): ProjectionStorePort {
   };
 }
 
+function makeTrackedArtifacts(): TrackedArtifactsPort {
+  const rows = new Map<string, TrackedArtifactRow>();
+  return {
+    async insertWaiting(r) {
+      rows.set(r.artifact_id, { ...r });
+    },
+    async getByArtifactId(id) {
+      const r = rows.get(id);
+      return r ? { ...r } : null;
+    },
+    async markTerminal(id, status, eid, at) {
+      const r = rows.get(id);
+      if (!r || r.status !== "waiting") return;
+      r.status = status;
+      r.terminal_reaction_event_id = eid;
+      r.terminal_status_at = at;
+    },
+    async claimDueWaiting() {
+      return [];
+    },
+    async countByStatus() {
+      const out: Partial<Record<TrackedArtifactStatus, number>> = {};
+      for (const r of rows.values()) out[r.status] = (out[r.status] ?? 0) + 1;
+      return out;
+    },
+  };
+}
+
+function deps() {
+  return {
+    eventStore: makeStore(),
+    projectionStore: makeProjStore(),
+    trackedArtifacts: makeTrackedArtifacts(),
+  };
+}
+
 function makeFailingBus(): EventBusPort {
   return {
-    async publish(_topic, _event) {
+    async publish() {
       throw new Error("bus is down");
     },
-    subscribe() {
+    async subscribe() {
       return async () => {};
     },
   };
 }
 
-describe("H1: onPublishError observability", () => {
+describe("onPublishError observability", () => {
   it("fires onPublishError when direct publish fails (with outbox)", async () => {
     const errors: Array<{ event: FeedbackEvent; err: unknown }> = [];
 
@@ -92,140 +143,96 @@ describe("H1: onPublishError observability", () => {
     };
 
     const feedback = createFeedback({
-      eventStore: makeStore(),
-      projectionStore: makeProjStore(),
+      ...deps(),
       eventBus: makeFailingBus(),
       outbox: fakeOutbox,
       actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
+      artifactTypes: [rejectByDefault("draft_email")],
       onPublishError: (event, err) => {
         errors.push({ event, err });
       },
     });
 
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
+    await feedback.captureArtifact({
+      artifact_type: "draft_email",
       artifact_id: "a-1",
       artifact_version: 1,
       producer: "t",
       task_type: "t",
       payload: {},
+      expires_at: FUTURE,
     });
 
-    // Wait one microtask for the fire-and-forget catch.
+    // Wait one tick for the fire-and-forget catch.
     await new Promise((r) => setTimeout(r, 50));
 
     expect(errors.length).toBeGreaterThan(0);
     expect((errors[0]!.err as Error).message).toBe("bus is down");
-    expect(enqueued.length).toBe(1); // outbox still enqueued
+    expect(enqueued.length).toBe(1);
   });
 
   it("fires onPublishError AND throws when no outbox is configured", async () => {
     const errors: unknown[] = [];
 
     const feedback = createFeedback({
-      eventStore: makeStore(),
-      projectionStore: makeProjStore(),
+      ...deps(),
       eventBus: makeFailingBus(),
       // No outbox
       actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
+      artifactTypes: [rejectByDefault("draft_email")],
       onPublishError: (_event, err) => {
         errors.push(err);
       },
     });
 
     await expect(
-      feedback.capture({
-        action: "approve",
-        artifact_type: "draft",
+      feedback.captureArtifact({
+        artifact_type: "draft_email",
         artifact_id: "a-1",
         artifact_version: 1,
         producer: "t",
         task_type: "t",
         payload: {},
+        expires_at: FUTURE,
       }),
     ).rejects.toThrow("bus is down");
 
-    expect(errors.length).toBe(1);
-  });
-
-  it("does not require onPublishError (still backward compatible)", async () => {
-    const enqueued: FeedbackEvent[] = [];
-    const fakeOutbox = {
-      async enqueue(event: FeedbackEvent) {
-        enqueued.push(event);
-      },
-      async pickUnpublished() {
-        return [];
-      },
-      async markPublished() {},
-      async markFailed() {},
-      async backlogSize() {
-        return 0;
-      },
-      async oldestUnpublishedAgeMs() {
-        return null;
-      },
-    };
-
-    const feedback = createFeedback({
-      eventStore: makeStore(),
-      projectionStore: makeProjStore(),
-      eventBus: makeFailingBus(),
-      outbox: fakeOutbox,
-      actions: DEFAULT_ACTIONS,
-      artifactTypes: [{ name: "draft" }],
-      // no onPublishError
-    });
-
-    // Should not throw even though bus fails
-    await feedback.capture({
-      action: "approve",
-      artifact_type: "draft",
-      artifact_id: "a-1",
-      artifact_version: 1,
-      producer: "t",
-      task_type: "t",
-      payload: {},
-    });
-
-    expect(enqueued.length).toBe(1);
+    // Wait for fire-and-forget catch (publishAfterCommit).
+    await new Promise((r) => setTimeout(r, 50));
+    expect(errors.length).toBeGreaterThanOrEqual(1);
   });
 });
 
-describe("H3: readStreamSince scopes history queries", () => {
-  it("uses readStreamSince to bound history loading by timestamp", async () => {
-    const calls: Array<{ method: string; pk: string; since?: string }> = [];
+describe("inline Layer 4 — actionability decisions", () => {
+  it("emits decisions when threshold is crossed within the window", async () => {
+    const decisions: ActionabilityDecisionsStore["appendBatch"] extends (b: infer T) => unknown
+      ? T extends Array<infer D>
+        ? D[]
+        : never
+      : never = [] as never;
 
-    const store: EventStorePort = {
-      async withTransaction(work) {
-        return work(undefined);
+    const decisionsStore: ActionabilityDecisionsStore = {
+      async appendBatch(batch) {
+        (decisions as unknown[]).push(...batch);
       },
-      async append() {},
-      async appendBatch() {},
-      async *readStream(pk) {
-        calls.push({ method: "readStream", pk });
-      },
-      async *readStreamSince(pk, since) {
-        calls.push({ method: "readStreamSince", pk, since });
-      },
-      async *readAll() {},
-      subscribeAll() {
-        return async () => {};
+      async *read() {
+        for (const d of decisions as unknown[]) {
+          yield d as never;
+        }
       },
     };
 
-    const rules = {
+    const rules: ActionabilityRulesPort = {
       async list() {
         return [
           {
-            rule_id: "r1",
-            applies_when: { action: "expired" },
-            threshold: 5,
-            window_ms: 24 * 60 * 60 * 1000,
-            result_if_met: "blacklist" as const,
+            rule_id: "regenerate_burst",
+            rule_version: "1",
+            applies_when: { action: "regenerated" },
+            axis: "content",
+            threshold: 3,
+            window_ms: 60_000,
+            result_if_met: "actionable_negative",
             active: true,
           },
         ];
@@ -235,39 +242,36 @@ describe("H3: readStreamSince scopes history queries", () => {
     };
 
     const feedback = createFeedback({
-      eventStore: store,
-      projectionStore: makeProjStore(),
-      inferenceRules: rules,
-      historyWindowMs: 24 * 60 * 60 * 1000, // 1 day
-      actions: [
-        ...DEFAULT_ACTIONS,
-        {
-          name: "test",
-          polarity: "positive",
-          defaultInference: "observe",
-          source: "explicit",
-          payloadSchema: z.object({}),
-        },
-      ],
-      artifactTypes: [{ name: "draft" }],
+      ...deps(),
+      actions: DEFAULT_ACTIONS,
+      artifactTypes: [rejectByDefault("draft_email")],
+      actionabilityRules: rules,
+      actionabilityDecisions: decisionsStore,
     });
 
-    await feedback.capture({
-      action: "test",
-      artifact_type: "draft",
+    const cap = await feedback.captureArtifact({
+      artifact_type: "draft_email",
       artifact_id: "a-1",
       artifact_version: 1,
-      producer: "t",
+      producer: "p",
       task_type: "t",
       payload: {},
+      expires_at: FUTURE,
     });
 
-    // History loader should call readStreamSince, NOT the unbounded readStream.
-    expect(calls.find((c) => c.method === "readStreamSince")).toBeTruthy();
-    expect(calls.find((c) => c.method === "readStream")).toBeFalsy();
-    // The since timestamp should be roughly 1 day ago (within a generous tolerance).
-    const sinceMs = Date.parse(calls[0]!.since!);
-    const expected = Date.now() - 24 * 60 * 60 * 1000;
-    expect(Math.abs(sinceMs - expected)).toBeLessThan(5_000);
+    // Three regenerated reactions in quick succession should crystallize.
+    await feedback.recordReaction({ artifact_id: cap.artifact_id, action: "regenerated" });
+    await feedback.recordReaction({ artifact_id: cap.artifact_id, action: "regenerated" });
+    await feedback.recordReaction({ artifact_id: cap.artifact_id, action: "regenerated" });
+
+    expect((decisions as unknown[]).length).toBeGreaterThanOrEqual(1);
+    const first = (decisions as unknown[])[0] as {
+      axis: string;
+      inference: string;
+      artifact_id: string;
+    };
+    expect(first.axis).toBe("content");
+    expect(first.inference).toBe("actionable_negative");
+    expect(first.artifact_id).toBe("a-1");
   });
 });

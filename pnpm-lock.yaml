@@ -41,10 +41,10 @@ importers:
 
   examples/minimal-nodejs:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@llm-feedback-middleware/in-memory':
+      '@ai-feedback-middleware/in-memory':
         specifier: workspace:*
         version: link:../../packages/in-memory
     devDependencies:
@@ -57,10 +57,10 @@ importers:
 
   examples/postgres-only:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@llm-feedback-middleware/postgres':
+      '@ai-feedback-middleware/postgres':
         specifier: workspace:*
         version: link:../../packages/postgres
       pg:
@@ -79,13 +79,13 @@ importers:
 
   examples/postgres-redis:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@llm-feedback-middleware/postgres':
+      '@ai-feedback-middleware/postgres':
         specifier: workspace:*
         version: link:../../packages/postgres
-      '@llm-feedback-middleware/redis-pubsub':
+      '@ai-feedback-middleware/redis-pubsub':
         specifier: workspace:*
         version: link:../../packages/redis-pubsub
       ioredis:
@@ -107,13 +107,13 @@ importers:
 
   examples/threshold-crystallization:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@llm-feedback-middleware/in-memory':
+      '@ai-feedback-middleware/in-memory':
         specifier: workspace:*
         version: link:../../packages/in-memory
-      '@llm-feedback-middleware/streams':
+      '@ai-feedback-middleware/streams':
         specifier: workspace:*
         version: link:../../packages/streams
       rxjs:
@@ -129,10 +129,10 @@ importers:
 
   examples/transactional-side-effect:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@llm-feedback-middleware/postgres':
+      '@ai-feedback-middleware/postgres':
         specifier: workspace:*
         version: link:../../packages/postgres
       pg:
@@ -151,7 +151,7 @@ importers:
 
   packages/adapter-conformance:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -183,11 +183,11 @@ importers:
 
   packages/in-memory:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@llm-feedback-middleware/adapter-conformance':
+      '@ai-feedback-middleware/adapter-conformance':
         specifier: workspace:*
         version: link:../adapter-conformance
       tsup:
@@ -202,14 +202,14 @@ importers:
 
   packages/postgres:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
       pg:
         specifier: ^8.13.1
         version: 8.20.0
     devDependencies:
-      '@llm-feedback-middleware/adapter-conformance':
+      '@ai-feedback-middleware/adapter-conformance':
         specifier: workspace:*
         version: link:../adapter-conformance
       '@types/pg':
@@ -227,14 +227,14 @@ importers:
 
   packages/redis-pubsub:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
       ioredis:
         specifier: ^5.4.2
         version: 5.10.1
     devDependencies:
-      '@llm-feedback-middleware/adapter-conformance':
+      '@ai-feedback-middleware/adapter-conformance':
         specifier: workspace:*
         version: link:../adapter-conformance
       tsup:
@@ -249,14 +249,14 @@ importers:
 
   packages/reference:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
       zod:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
-      '@llm-feedback-middleware/in-memory':
+      '@ai-feedback-middleware/in-memory':
         specifier: workspace:*
         version: link:../in-memory
       tsup:
@@ -271,14 +271,14 @@ importers:
 
   packages/streams:
     dependencies:
-      '@llm-feedback-middleware/core':
+      '@ai-feedback-middleware/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@llm-feedback-middleware/adapter-conformance':
+      '@ai-feedback-middleware/adapter-conformance':
         specifier: workspace:*
         version: link:../adapter-conformance
-      '@llm-feedback-middleware/in-memory':
+      '@ai-feedback-middleware/in-memory':
         specifier: workspace:*
         version: link:../in-memory
       rxjs:

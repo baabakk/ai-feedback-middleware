@@ -1,30 +1,40 @@
-import type { FeedbackEvent, ProjectionBuilder } from "@llm-feedback-middleware/core";
+import type {
+  CapturedEvaluatedReactionEvent,
+  ProjectionBuilder,
+} from "@ai-feedback-middleware/core";
 
-export interface BlacklistPhrase {
+export interface RemovedPhrase {
   phrase: string;
   /** Number of times this phrase has been observed in original-but-removed-by-edit. */
   count: number;
-  /** Last edit event_id that surfaced this phrase. */
+  /** Last manually_edited event_id that surfaced this phrase. */
   last_event_id: string;
   last_seen_at: string;
 }
 
-export interface BlacklistPhrasesState {
+export interface RemovedPhrasesState {
   /** Phrase string -> stats. */
-  phrases: Record<string, BlacklistPhrase>;
+  phrases: Record<string, RemovedPhrase>;
 }
 
-export interface BlacklistPhrasesOptions {
+export interface RemovedPhrasesOptions {
   /**
-   * The set of phrases the projection watches for. When an edit removes a
-   * phrase from this set (present in `original`, absent in `corrected`),
-   * the projection increments the count.
+   * The set of phrases the projection watches for. When a `manually_edited`
+   * reaction removes a phrase from this set (present in `original`, absent
+   * in `corrected`), the projection increments the count.
    *
    * Defaults to a small set of corporate-pleasantry filler typical of LLM
    * outputs.
    */
   watchPhrases?: string[];
 }
+
+/** @deprecated v1 alias for {@link RemovedPhrase}. */
+export type BlacklistPhrase = RemovedPhrase;
+/** @deprecated v1 alias for {@link RemovedPhrasesState}. */
+export type BlacklistPhrasesState = RemovedPhrasesState;
+/** @deprecated v1 alias for {@link RemovedPhrasesOptions}. */
+export type BlacklistPhrasesOptions = RemovedPhrasesOptions;
 
 const DEFAULT_WATCH_PHRASES = [
   "i hope this email finds you well",
@@ -40,25 +50,27 @@ const DEFAULT_WATCH_PHRASES = [
 ];
 
 /**
- * Reference projection: observes edits that REMOVE a watched phrase from the
- * original. When the user consistently strikes a phrase out, it's a strong
- * blacklist signal — the consumer can inject an "anti-pattern list" into
- * subsequent generations.
+ * Reference projection: observes `manually_edited` reactions that REMOVE a
+ * watched phrase from the original. When the user consistently strikes a
+ * phrase out, it's a strong negative-content signal on the content axis —
+ * the consumer can inject an "anti-pattern list" into subsequent generations.
  */
-export function createBlacklistPhrasesProjection(
-  options: BlacklistPhrasesOptions = {},
-): ProjectionBuilder<BlacklistPhrasesState> {
+export function createRemovedPhrasesProjection(
+  options: RemovedPhrasesOptions = {},
+): ProjectionBuilder<RemovedPhrasesState> {
   const watch = (options.watchPhrases ?? DEFAULT_WATCH_PHRASES).map((p) => p.toLowerCase());
 
   return {
-    name: "blacklist_phrases",
+    name: "removed_phrases",
     mode: "sync",
-    applies: (event) => event.action === "edit" && event.inference === "blacklist",
+    applies: (event) =>
+      event.event_kind === "reaction" && event.action === "manually_edited",
     // One global key — phrases are not partition-scoped (the same corporate
     // filler is junk regardless of which artifact triggered the edit).
     keyFor: () => "global",
-    apply: (event: FeedbackEvent, current) => {
-      const payload = event.payload as { original?: string; corrected?: string };
+    apply: (event, current) => {
+      const reaction = event as CapturedEvaluatedReactionEvent;
+      const payload = reaction.payload as { original?: string; corrected?: string };
       const original = (payload.original ?? "").toLowerCase();
       const corrected = (payload.corrected ?? "").toLowerCase();
       const prev = current?.phrases ?? {};
@@ -68,13 +80,12 @@ export function createBlacklistPhrasesProjection(
         const inOriginal = original.includes(phrase);
         const inCorrected = corrected.includes(phrase);
         if (inOriginal && !inCorrected) {
-          // Edit removed the phrase — increment.
           const existing = next[phrase];
           next[phrase] = {
             phrase,
             count: (existing?.count ?? 0) + 1,
-            last_event_id: event.event_id,
-            last_seen_at: event.captured_at,
+            last_event_id: reaction.event_id,
+            last_seen_at: reaction.captured_at,
           };
         }
       }
@@ -83,3 +94,6 @@ export function createBlacklistPhrasesProjection(
     },
   };
 }
+
+/** @deprecated v1 alias. Use {@link createRemovedPhrasesProjection}. */
+export const createBlacklistPhrasesProjection = createRemovedPhrasesProjection;

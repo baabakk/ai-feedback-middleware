@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/baabakk/ai-feedback-middleware/schemas/captured-evaluated-reaction.schema.json",
+  "title": "CapturedEvaluatedReactionEvent",
+  "description": "Reaction-kind event shape (event_kind='reaction') from @ai-feedback-middleware/core (v2.1). Per-axis polarity is computed by Layer 3 (Reaction Evaluation) and embedded inline. Source of truth lives in packages/core/src/event-types.ts (Zod).",
+  "type": "object",
+  "required": [
+    "event_kind",
+    "event_id",
+    "event_version",
+    "artifact_id",
+    "artifact_type",
+    "artifact_version",
+    "partition_key",
+    "producer",
+    "task_type",
+    "source",
+    "action",
+    "evaluations",
+    "classifier_version",
+    "occurred_at",
+    "captured_at",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_kind": { "type": "string", "const": "reaction" },
+    "event_id": { "type": "string" },
+    "event_version": { "type": "integer", "minimum": 1 },
+    "artifact_id": { "type": "string" },
+    "artifact_type": { "type": "string" },
+    "artifact_version": { "type": "integer", "minimum": 0 },
+    "partition_key": { "type": "string" },
+    "producer": { "type": "string" },
+    "task_type": { "type": "string" },
+    "source": {
+      "type": "string",
+      "enum": ["explicit", "implicit", "meta"]
+    },
+    "action": {
+      "type": "string",
+      "description": "One of the 13 framework-locked actions or a registered custom action."
+    },
+    "evaluations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-axis polarity. Each axis is omitted when there is no signal — never set to null/undefined explicitly.",
+      "properties": {
+        "detection": { "type": "string", "enum": ["positive", "negative"] },
+        "content": { "type": "string", "enum": ["positive", "negative"] },
+        "timing": { "type": "string", "enum": ["positive", "negative"] },
+        "channel": { "type": "string", "enum": ["positive", "negative"] }
+      }
+    },
+    "classifier_version": { "type": "string" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "payload": {
+      "oneOf": [
+        { "type": "object" },
+        { "type": "array" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["channel", "captured_by_adapter"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "type": "string" },
+        "instance_id": { "type": "string" },
+        "latency_ms": { "type": "number" },
+        "captured_by_adapter": { "type": "string" }
+      }
+    },
+    "correction_of_event_id": {
+      "type": "string",
+      "description": "Tombstone target. Required when action='corrected'."
+    },
+    "successor_artifact_id": {
+      "type": "string",
+      "description": "Tombstone target. Required when action='superseded_by'."
+    }
+  }
+}

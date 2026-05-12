@@ -1,4 +1,4 @@
-# Contributing to llm-feedback-middleware
+# Contributing to ai-feedback-middleware
 
 > **This project is in early development (v0.x).** APIs may change. Contributions are welcome but please open an issue first to discuss substantial changes.
 
@@ -6,7 +6,7 @@
 
 ```bash
 git clone <repo>
-cd llm-feedback-middleware
+cd ai-feedback-middleware
 pnpm install
 pnpm test
 ```

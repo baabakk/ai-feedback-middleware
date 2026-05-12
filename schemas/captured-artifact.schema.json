@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/baabakk/ai-feedback-middleware/schemas/captured-artifact.schema.json",
+  "title": "CapturedArtifactEvent",
+  "description": "Capture-kind event shape (event_kind='capture') from @ai-feedback-middleware/core (v2.1). Source of truth lives in packages/core/src/event-types.ts (Zod). Regenerate via schemas/generate.ts.",
+  "type": "object",
+  "required": [
+    "event_kind",
+    "event_id",
+    "event_version",
+    "artifact_id",
+    "artifact_type",
+    "artifact_version",
+    "partition_key",
+    "producer",
+    "task_type",
+    "expires_at",
+    "occurred_at",
+    "captured_at",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_kind": { "type": "string", "const": "capture" },
+    "event_id": { "type": "string" },
+    "event_version": { "type": "integer", "minimum": 1 },
+    "artifact_id": { "type": "string" },
+    "artifact_type": { "type": "string" },
+    "artifact_version": { "type": "integer", "minimum": 0 },
+    "partition_key": { "type": "string" },
+    "producer": { "type": "string" },
+    "task_type": { "type": "string" },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "REQUIRED. Lifecycle deadline; the Lifecycle Worker uses this to fire silently_accepted or silently_rejected_expired."
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "payload": {
+      "oneOf": [
+        { "type": "object" },
+        { "type": "array" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["channel", "captured_by_adapter"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "type": "string" },
+        "instance_id": { "type": "string" },
+        "latency_ms": { "type": "number" },
+        "captured_by_adapter": { "type": "string" }
+      }
+    },
+    "previous_artifact_id": {
+      "type": "string",
+      "description": "Optional pointer to a prior artifact this one supersedes."
+    }
+  }
+}

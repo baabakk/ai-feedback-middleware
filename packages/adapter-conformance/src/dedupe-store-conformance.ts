@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { DedupeStorePort } from "@llm-feedback-middleware/core";
+import type { DedupeStorePort } from "@ai-feedback-middleware/core";
 
 export interface DedupeStoreConformanceOptions {
   name: string;

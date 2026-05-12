@@ -25,7 +25,8 @@ export function loggingMiddleware(options: LoggingOptions = {}): Middleware<Feed
     const start = Date.now();
     log("debug", `[${pipeline}] handling`, {
       event_id: event.event_id,
-      action: event.action,
+      event_kind: event.event_kind,
+      action: event.event_kind === "reaction" ? event.action : undefined,
       pipeline,
     });
     try {

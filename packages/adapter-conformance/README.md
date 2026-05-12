@@ -1,7 +1,7 @@
-# `@llm-feedback-middleware/adapter-conformance`
+# `@ai-feedback-middleware/adapter-conformance`
 
 Conformance test suites that any adapter implementing an
-`@llm-feedback-middleware/core` port must pass. Drop these into your adapter's
+`@ai-feedback-middleware/core` port must pass. Drop these into your adapter's
 test directory; if every suite passes, your adapter is interchangeable with
 the in-memory and Postgres reference implementations.
 
@@ -15,7 +15,7 @@ without surprises.
 ## Install
 
 ```bash
-pnpm add -D @llm-feedback-middleware/adapter-conformance @llm-feedback-middleware/core
+pnpm add -D @ai-feedback-middleware/adapter-conformance @ai-feedback-middleware/core
 # vitest is a peer dependency
 pnpm add -D vitest
 ```
@@ -35,7 +35,7 @@ Each suite registers a vitest `describe(...)` block. Wire it from your
 adapter's test file:
 
 ```typescript
-import { runEventStoreConformance } from "@llm-feedback-middleware/adapter-conformance";
+import { runEventStoreConformance } from "@ai-feedback-middleware/adapter-conformance";
 import { createMyAdapter } from "../src/index.js";
 
 runEventStoreConformance({

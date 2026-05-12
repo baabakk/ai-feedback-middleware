@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { EventBusPort } from "@llm-feedback-middleware/core";
-import { makeEvent } from "./test-fixtures.js";
+import type { EventBusPort } from "@ai-feedback-middleware/core";
+import { makeReaction } from "./test-fixtures.js";
 import { waitUntil } from "./poll.js";
+
+const makeEvent = makeReaction;
 
 export interface EventBusConformanceOptions {
   name: string;
@@ -41,7 +43,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
 
     it("publish + subscribe round-trip on exact topic", async () => {
       const received: string[] = [];
-      const unsub = bus.subscribe("feedback.captured", async (e) => {
+      const unsub = await bus.subscribe("feedback.captured", async (e) => {
         received.push(e.event_id);
       });
       try {
@@ -56,12 +58,12 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
     it("subscriber does not receive events on different topics", async () => {
       const received: string[] = [];
       const otherReceived: string[] = [];
-      const unsub = bus.subscribe("feedback.captured.explicit.positive", async (e) => {
+      const unsub = await bus.subscribe("feedback.captured.explicit.positive", async (e) => {
         received.push(e.event_id);
       });
       // Probe subscriber on the actual published topic so we can wait until
       // delivery has happened; without this we'd be waiting blind.
-      const unsubProbe = bus.subscribe("feedback.captured.explicit.negative", async (e) => {
+      const unsubProbe = await bus.subscribe("feedback.captured.explicit.negative", async (e) => {
         otherReceived.push(e.event_id);
       });
       try {
@@ -77,10 +79,10 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
     it("multiple subscribers on the same topic each receive the event", async () => {
       const a: string[] = [];
       const b: string[] = [];
-      const unsubA = bus.subscribe("feedback.captured", async (e) => {
+      const unsubA = await bus.subscribe("feedback.captured", async (e) => {
         a.push(e.event_id);
       });
-      const unsubB = bus.subscribe("feedback.captured", async (e) => {
+      const unsubB = await bus.subscribe("feedback.captured", async (e) => {
         b.push(e.event_id);
       });
       try {
@@ -96,7 +98,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
 
     it("subscribe with array of topics receives events for all", async () => {
       const received: string[] = [];
-      const unsub = bus.subscribe(
+      const unsub = await bus.subscribe(
         ["feedback.captured.explicit.positive", "feedback.captured.implicit.positive"],
         async (e) => {
           received.push(e.event_id);
@@ -104,7 +106,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       );
       // Probe to know when the negative publish has been processed by the bus.
       const negSeen: string[] = [];
-      const unsubProbe = bus.subscribe("feedback.captured.explicit.negative", async (e) => {
+      const unsubProbe = await bus.subscribe("feedback.captured.explicit.negative", async (e) => {
         negSeen.push(e.event_id);
       });
       try {
@@ -120,9 +122,8 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
           "feedback.captured.explicit.negative",
           makeEvent({
             event_id: "exp-neg",
-            polarity: "negative",
-            inference: "blacklist",
-            action: "reject",
+            action: "rejected",
+            evaluations: { content: "negative" },
           }),
         );
         await waitUntil(
@@ -143,7 +144,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
 
     it("unsubscribe stops further deliveries", async () => {
       const received: string[] = [];
-      const unsub = bus.subscribe("feedback.captured", async (e) => {
+      const unsub = await bus.subscribe("feedback.captured", async (e) => {
         received.push(e.event_id);
       });
       await bus.publish("feedback.captured", makeEvent({ event_id: "before" }));
@@ -153,7 +154,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       // next publish has reached the bus, then assert the original
       // subscriber never saw it.
       const probe: string[] = [];
-      const unsubProbe = bus.subscribe("feedback.captured", async (e) => {
+      const unsubProbe = await bus.subscribe("feedback.captured", async (e) => {
         probe.push(e.event_id);
       });
       try {
@@ -168,7 +169,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
 
     it("preserves payload through the bus", async () => {
       let captured: unknown = null;
-      const unsub = bus.subscribe("feedback.captured", async (e) => {
+      const unsub = await bus.subscribe("feedback.captured", async (e) => {
         captured = e.payload;
       });
       try {
@@ -188,13 +189,13 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
       // callback (or be absorbed but not block other dispatches).
       const goodA: string[] = [];
       const goodB: string[] = [];
-      const unsubBad = bus.subscribe("feedback.captured", async () => {
+      const unsubBad = await bus.subscribe("feedback.captured", async () => {
         throw new Error("intentional handler failure for fault-injection conformance");
       });
-      const unsubA = bus.subscribe("feedback.captured", async (e) => {
+      const unsubA = await bus.subscribe("feedback.captured", async (e) => {
         goodA.push(e.event_id);
       });
-      const unsubB = bus.subscribe("feedback.captured", async (e) => {
+      const unsubB = await bus.subscribe("feedback.captured", async (e) => {
         goodB.push(e.event_id);
       });
       try {
@@ -214,7 +215,7 @@ export function runEventBusConformance(options: EventBusConformanceOptions): voi
     if (supportsWildcards) {
       it("wildcard subscribe matches sub-topics", async () => {
         const received: string[] = [];
-        const unsub = bus.subscribe("feedback.captured.*", async (e) => {
+        const unsub = await bus.subscribe("feedback.captured.*", async (e) => {
           received.push(e.event_id);
         });
         try {

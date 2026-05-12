@@ -1,6 +1,6 @@
 # postgres-only
 
-Postgres-backed example using `@llm-feedback-middleware/postgres`.
+Postgres-backed example using `@ai-feedback-middleware/postgres`.
 
 ## Run
 

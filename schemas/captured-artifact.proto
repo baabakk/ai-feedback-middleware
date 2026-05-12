@@ -1,0 +1,45 @@
+// Canonical proto3 definition for CapturedArtifactEvent (v2.1).
+// Source of truth: packages/core/src/event-types.ts (Zod schema).
+// Regenerate via schemas/generate.ts when the Zod schema changes.
+
+syntax = "proto3";
+
+package llm_feedback_middleware.v2;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+message CapturedArtifactEvent {
+  // Discriminator. Always "capture" for this message.
+  string event_kind = 1;
+
+  string event_id = 2;
+  uint32 event_version = 3;
+
+  string artifact_id = 4;
+  string artifact_type = 5;
+  uint32 artifact_version = 6;
+  string partition_key = 7;
+  string producer = 8;
+  string task_type = 9;
+
+  // REQUIRED. Lifecycle deadline.
+  google.protobuf.Timestamp expires_at = 10;
+  google.protobuf.Timestamp occurred_at = 11;
+  google.protobuf.Timestamp captured_at = 12;
+
+  // Free-form action-specific payload. Encoded as Struct for cross-language fidelity.
+  google.protobuf.Struct payload = 13;
+
+  Provenance provenance = 14;
+
+  // Optional pointer to a prior artifact this one supersedes.
+  optional string previous_artifact_id = 15;
+}
+
+message Provenance {
+  string channel = 1;
+  optional string instance_id = 2;
+  optional double latency_ms = 3;
+  string captured_by_adapter = 4;
+}

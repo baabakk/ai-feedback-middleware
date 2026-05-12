@@ -25,7 +25,7 @@ run the conformance suite, ship.
 5. **Wire the conformance suite into your tests.**
 
    ```typescript
-   import { runEventStoreConformance } from "@llm-feedback-middleware/adapter-conformance";
+   import { runEventStoreConformance } from "@ai-feedback-middleware/adapter-conformance";
    import { createMyAdapter } from "../src/index.js";
 
    runEventStoreConformance({
@@ -70,7 +70,7 @@ write them in addition to the conformance suite, not instead of it.
 
 If you intend to publish your adapter:
 
-- Use the `@llm-feedback-middleware-community/<name>` npm scope (planned;
+- Use the `@ai-feedback-middleware-community/<name>` npm scope (planned;
   ping the maintainers on GitHub Discussions for inclusion).
 - Match the framework's TypeScript strictness, ESM-only output, and
   `engines.node >= 18` claim.
@@ -80,7 +80,7 @@ If you intend to publish your adapter:
 ## Versioning
 
 Adapters version independently. Pin a specific minor version of
-`@llm-feedback-middleware/core` as a peer dependency to declare the
+`@ai-feedback-middleware/core` as a peer dependency to declare the
 contract version your adapter targets.
 
 ## Common pitfalls

@@ -1,4 +1,4 @@
-# @llm-feedback-middleware/reference
+# @ai-feedback-middleware/reference
 
 Reference projections and capture adapters. Use as templates or starting points; nothing here is a hard requirement.
 

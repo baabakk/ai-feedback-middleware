@@ -49,7 +49,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/feedback-tarballs
           for pkg in core in-memory postgres redis-pubsub streams reference adapter-conformance; do
-            tarball=$(pnpm --filter "@llm-feedback-middleware/$pkg" pack --pack-destination /tmp/feedback-tarballs | tail -1)
+            tarball=$(pnpm --filter "@ai-feedback-middleware/$pkg" pack --pack-destination /tmp/feedback-tarballs | tail -1)
             echo "Packed $pkg: $tarball"
           done
           ls -lh /tmp/feedback-tarballs/
@@ -66,18 +66,18 @@ jobs:
             npm install --no-save "$tarball"
           done
           npm install --no-save zod
-          ls node_modules/@llm-feedback-middleware/
+          ls node_modules/@ai-feedback-middleware/
 
       - name: Run minimal smoke against installed artifacts
         shell: bash
         run: |
           set -euo pipefail
           cat > /tmp/scratch/smoke.mjs <<'EOF'
-          import { createFeedback, DEFAULT_ACTIONS, matchesTopic } from "@llm-feedback-middleware/core";
+          import { createFeedback, DEFAULT_ACTIONS, matchesTopic } from "@ai-feedback-middleware/core";
           import {
             createInMemoryEventStore,
             createInMemoryProjectionStore,
-          } from "@llm-feedback-middleware/in-memory";
+          } from "@ai-feedback-middleware/in-memory";
 
           const feedback = createFeedback({
             eventStore: createInMemoryEventStore(),

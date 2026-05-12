@@ -11,8 +11,19 @@ import type { Transaction } from "./event-store-port.js";
  * down, the scanner retries with backoff.
  */
 export interface OutboxPort {
-  /** Enqueue an event for later publishing. Joins the enclosing transaction. */
-  enqueue(event: FeedbackEvent, topics: string[], tx?: Transaction): Promise<void>;
+  /**
+   * Enqueue an event for later publishing. Joins the enclosing transaction.
+   * `artifact_id` is denormalized onto the row for spec §9.5 artifact_progress
+   * view joins; it should be the artifact this event refers to (the
+   * `artifact_id` field on both `CapturedArtifactEvent` and
+   * `CapturedEvaluatedReactionEvent`).
+   */
+  enqueue(
+    event: FeedbackEvent,
+    topics: string[],
+    artifact_id: string,
+    tx?: Transaction,
+  ): Promise<void>;
 
   /**
    * Yield up to `limit` outbox rows that are eligible for publishing.
@@ -33,6 +44,7 @@ export interface OutboxPort {
 
 export interface OutboxRow {
   event_id: string;
+  artifact_id: string;
   topics: string[];
   enqueued_at: string;
   attempt_count: number;

@@ -70,7 +70,7 @@ should usually be retried in the background.
 ## Writing your own middleware
 
 ```typescript
-import type { Middleware } from "@llm-feedback-middleware/core";
+import type { Middleware } from "@ai-feedback-middleware/core";
 
 export const tracingMiddleware =
   (tracer: Tracer): Middleware =>

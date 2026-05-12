@@ -7,7 +7,7 @@ import {
   type Unsubscribe,
   assertSupportedSubscribeOptions,
   matchesTopic,
-} from "@llm-feedback-middleware/core";
+} from "@ai-feedback-middleware/core";
 
 const CAPABILITIES: SubscribeCapabilities = {
   adapterName: "createRedisPubSubEventBus",
@@ -145,11 +145,11 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
       await pipe.exec();
     },
 
-    subscribe(
+    async subscribe(
       topic: string | string[],
       handler: (event: FeedbackEvent, topic: string) => Promise<void>,
       options?: SubscribeOptions,
-    ): Unsubscribe {
+    ): Promise<Unsubscribe> {
       assertSupportedSubscribeOptions(options, CAPABILITIES);
       installListener();
       const patterns = Array.isArray(topic) ? topic : [topic];
@@ -157,15 +157,18 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
       subscriptions.set(id, { patterns, handler });
 
       // Subscribe at the Redis layer. Use PSUBSCRIBE for any pattern containing
-      // `*` or `>`, otherwise plain SUBSCRIBE.
+      // `*` or `>`, otherwise plain SUBSCRIBE. AWAIT the round-trip so the
+      // promise resolves only when Redis has the subscription registered —
+      // otherwise an immediately-following publish() will be dropped.
       const redisChannels = patterns.map(toRedisPattern);
-      const subscribePromises = redisChannels.map((ch) =>
-        ch.includes("*") ? subscriber.psubscribe(ch) : subscriber.subscribe(ch),
+      await Promise.all(
+        redisChannels.map((ch) =>
+          ch.includes("*") ? subscriber.psubscribe(ch) : subscriber.subscribe(ch),
+        ),
       );
 
       return async () => {
         subscriptions.delete(id);
-        // Unsubscribe at Redis only if no other local subscription needs the channel.
         await Promise.all(
           redisChannels.map((ch) =>
             ch.includes("*")
@@ -173,8 +176,6 @@ export function createRedisPubSubEventBus(options: RedisPubSubOptions): EventBus
               : subscriber.unsubscribe(ch).catch(() => {}),
           ),
         );
-        // Wait for any in-flight subscribe to settle to keep teardown clean.
-        await Promise.all(subscribePromises.map((p) => p.catch(() => {})));
       };
     },
 

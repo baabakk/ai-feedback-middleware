@@ -1,13 +1,29 @@
 import type { z } from "zod";
-import type { Polarity, Inference, Source } from "../event-types.js";
+import type { EvaluationVector, Source } from "../event-types.js";
 
+/**
+ * A registered action. The framework ships thirteen canonical actions in
+ * `DEFAULT_ACTIONS`; consumers may extend with custom actions via
+ * `ActionRegistry`.
+ *
+ * `defaultEvaluations` is the per-axis polarity heuristic the classifier
+ * applies in absence of richer signal. Consumers may override per-event via
+ * `RecordReactionInput.evaluations_override`.
+ */
 export interface FeedbackActionDefinition {
   name: string;
-  polarity: Polarity;
-  defaultInference: Inference;
   source: Source;
+  defaultEvaluations: EvaluationVector;
   payloadSchema: z.ZodType<unknown>;
   description?: string;
+}
+
+/**
+ * Helper for consumer-declared custom actions. Returns the input unchanged
+ * but attaches an explicit type so consumers get IDE help.
+ */
+export function registerAction(action: FeedbackActionDefinition): FeedbackActionDefinition {
+  return action;
 }
 
 export class ActionRegistry {

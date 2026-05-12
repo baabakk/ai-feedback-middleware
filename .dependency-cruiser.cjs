@@ -30,7 +30,7 @@ module.exports = {
     {
       name: "core-no-sibling-imports",
       severity: "error",
-      comment: "@llm-feedback-middleware/core must not import from any other package in the monorepo.",
+      comment: "@ai-feedback-middleware/core must not import from any other package in the monorepo.",
       from: { path: "^packages/core/" },
       to: { path: "^packages/(?!core/)" },
     },

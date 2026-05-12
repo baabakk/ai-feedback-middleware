@@ -1,17 +1,17 @@
 {
-  "name": "@llm-feedback-middleware/streams",
-  "version": "0.0.0",
+  "name": "@ai-feedback-middleware/streams",
+  "version": "0.3.0-alpha.0",
   "description": "Optional RxJS stream wrapper for composable subscribers (debounce, buffer, groupBy, windowTime).",
   "license": "Apache-2.0",
   "author": "Babak Abbaschian",
-  "homepage": "https://github.com/baabakk/llm-feedback-middleware",
+  "homepage": "https://github.com/baabakk/ai-feedback-middleware",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/baabakk/llm-feedback-middleware.git",
+    "url": "git+https://github.com/baabakk/ai-feedback-middleware.git",
     "directory": "packages/streams"
   },
   "bugs": {
-    "url": "https://github.com/baabakk/llm-feedback-middleware/issues"
+    "url": "https://github.com/baabakk/ai-feedback-middleware/issues"
   },
   "keywords": [
     "feedback",
@@ -42,14 +42,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llm-feedback-middleware/core": "workspace:*"
+    "@ai-feedback-middleware/core": "workspace:*"
   },
   "peerDependencies": {
     "rxjs": "^7.8.0"
   },
   "devDependencies": {
-    "@llm-feedback-middleware/adapter-conformance": "workspace:*",
-    "@llm-feedback-middleware/in-memory": "workspace:*",
+    "@ai-feedback-middleware/adapter-conformance": "workspace:*",
+    "@ai-feedback-middleware/in-memory": "workspace:*",
     "rxjs": "^7.8.1",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",

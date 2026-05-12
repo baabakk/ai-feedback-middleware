@@ -1,6 +1,6 @@
 {
-  "name": "llm-feedback-middleware-monorepo",
-  "version": "0.0.0",
+  "name": "ai-feedback-middleware-monorepo",
+  "version": "0.3.0-alpha.0",
   "private": true,
   "description": "Provider-agnostic feedback middleware for LLM and AI systems. Captures, classifies, stores, and dispatches feedback signals.",
   "license": "Apache-2.0",
@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
+    "test:integration": "node scripts/test-integration.mjs",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",

@@ -23,13 +23,13 @@ Closes #
 
 <!-- Tick all that apply. -->
 
-- [ ] `@llm-feedback-middleware/core`
-- [ ] `@llm-feedback-middleware/in-memory`
-- [ ] `@llm-feedback-middleware/postgres`
-- [ ] `@llm-feedback-middleware/redis-pubsub`
-- [ ] `@llm-feedback-middleware/streams`
-- [ ] `@llm-feedback-middleware/reference`
-- [ ] `@llm-feedback-middleware/adapter-conformance`
+- [ ] `@ai-feedback-middleware/core`
+- [ ] `@ai-feedback-middleware/in-memory`
+- [ ] `@ai-feedback-middleware/postgres`
+- [ ] `@ai-feedback-middleware/redis-pubsub`
+- [ ] `@ai-feedback-middleware/streams`
+- [ ] `@ai-feedback-middleware/reference`
+- [ ] `@ai-feedback-middleware/adapter-conformance`
 - [ ] documentation only
 - [ ] CI / repo tooling only
 
