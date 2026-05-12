@@ -66,11 +66,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build core (required by adapter packages)
-        run: pnpm --filter @ai-feedback-middleware/core build
-
-      - name: Build adapter-conformance (required by tests)
-        run: pnpm --filter @ai-feedback-middleware/adapter-conformance build
+      - name: Build all packages (typecheck needs dist d.ts for cross-package imports)
+        run: pnpm -r build
 
       - name: Lint
         if: matrix.node-version == 22
